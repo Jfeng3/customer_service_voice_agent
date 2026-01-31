@@ -147,9 +147,9 @@ You have access to web_search to find current information from the internet. Use
         // Notify tool complete
         await onToolComplete?.(toolName, toolCallId, result)
 
-        // Store tool call in database
-        const { error: toolCallError } = await supabaseAdmin.from('csva_tool_calls').insert({
-          id: toolCallId,
+        // Store tool call in database (let Supabase generate UUID, store tool_call_id separately)
+        const toolCallData = {
+          tool_call_id: toolCallId,
           session_id: sessionId,
           tool_name: toolName,
           input: args,
@@ -157,9 +157,18 @@ You have access to web_search to find current information from the internet. Use
           status: 'completed',
           duration_ms: duration,
           completed_at: new Date().toISOString(),
-        })
+        }
+        console.log('Saving tool call to DB:', JSON.stringify(toolCallData, null, 2))
+
+        const { data: insertedData, error: toolCallError } = await supabaseAdmin
+          .from('csva_tool_calls')
+          .insert(toolCallData)
+          .select()
+
         if (toolCallError) {
-          console.error('Failed to save tool call:', toolCallError.message)
+          console.error('Failed to save tool call:', toolCallError.message, toolCallError.details, toolCallError.hint)
+        } else {
+          console.log('Tool call saved successfully:', insertedData)
         }
 
         // Add tool result message

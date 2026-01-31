@@ -57,6 +57,7 @@ export interface ToolProgress {
 // Tool call record from database
 export interface ToolCallRecord {
   id: string
+  tool_call_id: string
   session_id: string
   tool_name: string
   input: Record<string, unknown>
