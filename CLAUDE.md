@@ -10,6 +10,7 @@ A voice-enabled customer service agent built with Next.js, featuring real-time t
 - **Queue**: QStash (Upstash)
 - **Database**: Supabase (PostgreSQL)
 - **Real-time**: Supabase Realtime Broadcast
+- **Observability**: Weave (W&B) for agent tracking
 
 ## Architecture
 ```
@@ -38,6 +39,8 @@ Required in `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anon key
 - `SUPABASE_SECRET_KEY` - Supabase service role key
 - `NEXT_PUBLIC_APP_URL` - Public URL (ngrok for local dev)
+- `WANDB_API_KEY` - Weights & Biases API key (for agent observability)
+- `WANDB_PROJECT` - W&B project name (default: customer-service-voice-agent)
 
 ## Database Tables
 - `csva_messages` - Chat message history

@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid'
 import { supabaseAdmin } from '@/lib/supabase/server'
+import { ensureWeaveInitialized, weave } from '@/lib/weave/client'
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
 const MODEL = 'anthropic/claude-opus-4.5'
@@ -62,11 +63,16 @@ interface OpenRouterResponse {
     }
     finish_reason: string
   }[]
+  usage?: {
+    prompt_tokens: number
+    completion_tokens: number
+    total_tokens: number
+  }
 }
 
 export async function callOpenRouter(
   options: CallOpenRouterOptions
-): Promise<{ content: string }> {
+): Promise<{ content: string; usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number } }> {
   const {
     messages,
     tools,
@@ -77,6 +83,9 @@ export async function callOpenRouter(
     onResponseChunk,
     executeTool,
   } = options
+
+  // Initialize Weave for tracking
+  await ensureWeaveInitialized()
 
   // Build messages array with system prompt
   const allMessages: Message[] = [
@@ -91,8 +100,15 @@ You have access to web_search to find current information from the internet. Use
 
   let continueLoop = true
   let finalContent = ''
+  let totalUsage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+  let llmCallCount = 0
+  let toolCallCount = 0
+  const sessionStartTime = Date.now()
 
   while (continueLoop) {
+    llmCallCount++
+    const llmStartTime = Date.now()
+
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -108,14 +124,48 @@ You have access to web_search to find current information from the internet. Use
       }),
     })
 
+    const llmLatency = Date.now() - llmStartTime
+
     if (!response.ok) {
       const errorText = await response.text()
+      // Log error to Weave
+      weave.op({
+        name: 'llm_error',
+      })(() => ({
+        error: `OpenRouter API error: ${response.status}`,
+        errorText,
+        model: MODEL,
+        sessionId,
+      }))()
       throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`)
     }
 
     const data: OpenRouterResponse = await response.json()
     const choice = data.choices[0]
     const message = choice.message
+
+    // Track token usage
+    if (data.usage) {
+      totalUsage.prompt_tokens += data.usage.prompt_tokens
+      totalUsage.completion_tokens += data.usage.completion_tokens
+      totalUsage.total_tokens += data.usage.total_tokens
+    }
+
+    // Log LLM call to Weave
+    const logLLMCall = weave.op({
+      name: 'llm_call',
+    })
+    logLLMCall(() => ({
+      model: MODEL,
+      sessionId,
+      callNumber: llmCallCount,
+      latencyMs: llmLatency,
+      finishReason: choice.finish_reason,
+      hasToolCalls: !!(message.tool_calls && message.tool_calls.length > 0),
+      toolCallCount: message.tool_calls?.length || 0,
+      usage: data.usage || null,
+      inputMessages: allMessages.length,
+    }))()
 
     // Check if there are tool calls
     if (message.tool_calls && message.tool_calls.length > 0) {
@@ -128,6 +178,7 @@ You have access to web_search to find current information from the internet. Use
 
       // Execute each tool call
       for (const toolCall of message.tool_calls) {
+        toolCallCount++
         const toolName = toolCall.function.name
         const toolCallId = toolCall.id
         const args = JSON.parse(toolCall.function.arguments)
@@ -143,6 +194,20 @@ You have access to web_search to find current information from the internet. Use
         })
 
         const duration = Date.now() - startTime
+
+        // Log tool execution to Weave
+        const logToolExecution = weave.op({
+          name: 'tool_execution',
+        })
+        logToolExecution(() => ({
+          toolName,
+          toolCallId,
+          sessionId,
+          durationMs: duration,
+          inputArgs: args,
+          outputSize: JSON.stringify(result).length,
+          success: true,
+        }))()
 
         // Notify tool complete
         await onToolComplete?.(toolName, toolCallId, result)
@@ -193,5 +258,22 @@ You have access to web_search to find current information from the internet. Use
     }
   }
 
-  return { content: finalContent }
+  // Log session summary to Weave
+  const sessionDuration = Date.now() - sessionStartTime
+  const logSessionSummary = weave.op({
+    name: 'agent_session',
+  })
+  logSessionSummary(() => ({
+    sessionId,
+    model: MODEL,
+    totalDurationMs: sessionDuration,
+    llmCallCount,
+    toolCallCount,
+    totalTokens: totalUsage.total_tokens,
+    promptTokens: totalUsage.prompt_tokens,
+    completionTokens: totalUsage.completion_tokens,
+    responseLength: finalContent.length,
+  }))()
+
+  return { content: finalContent, usage: totalUsage }
 }
