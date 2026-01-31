@@ -1,0 +1,146 @@
+'use client'
+
+import { useState, useCallback, useEffect } from 'react'
+import { nanoid } from 'nanoid'
+import { supabase } from '@/lib/supabase/client'
+import type { Message } from '@/types/chat'
+
+interface UseChatReturn {
+  messages: Message[]
+  isLoading: boolean
+  sessionId: string
+  sendMessage: (content: string) => Promise<void>
+  clearMessages: () => void
+  error: string | null
+}
+
+export function useChat(): UseChatReturn {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string>('')
+  const [error, setError] = useState<string | null>(null)
+
+  // Generate sessionId only on client to avoid hydration mismatch
+  useEffect(() => {
+    setSessionId(nanoid())
+  }, [])
+
+  // Load existing messages for this session
+  useEffect(() => {
+    if (!sessionId) return
+
+    async function loadMessages() {
+      const { data, error: fetchError } = await supabase
+        .from('csva_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true })
+
+      if (fetchError) {
+        console.error('Failed to load messages:', fetchError)
+        return
+      }
+
+      if (data) {
+        setMessages(data)
+      }
+    }
+
+    loadMessages()
+  }, [sessionId])
+
+  // Subscribe to new messages for this session
+  useEffect(() => {
+    if (!sessionId) return
+
+    const channel = supabase
+      .channel(`messages:${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'csva_messages',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          const newMessage = payload.new as Message
+          setMessages((prev) => {
+            // Avoid duplicates
+            if (prev.some((m) => m.id === newMessage.id)) {
+              return prev
+            }
+            return [...prev, newMessage]
+          })
+
+          // Stop loading when we get an assistant message
+          if (newMessage.role === 'assistant') {
+            setIsLoading(false)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [sessionId])
+
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim() || !sessionId) return
+
+      setError(null)
+      setIsLoading(true)
+
+      // Optimistically add user message
+      const tempMessage: Message = {
+        id: `temp_${nanoid()}`,
+        session_id: sessionId,
+        role: 'user',
+        content: content.trim(),
+        created_at: new Date().toISOString(),
+      }
+      setMessages((prev) => [...prev, tempMessage])
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            message: content.trim(),
+          }),
+        })
+
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || 'Failed to send message')
+        }
+      } catch (err) {
+        console.error('Send message error:', err)
+        setError(err instanceof Error ? err.message : 'Failed to send message')
+        setIsLoading(false)
+
+        // Remove optimistic message on error
+        setMessages((prev) =>
+          prev.filter((m) => m.id !== tempMessage.id)
+        )
+      }
+    },
+    [sessionId]
+  )
+
+  const clearMessages = useCallback(() => {
+    setMessages([])
+  }, [])
+
+  return {
+    messages,
+    isLoading,
+    sessionId,
+    sendMessage,
+    clearMessages,
+    error,
+  }
+}
