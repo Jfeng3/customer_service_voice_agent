@@ -5,6 +5,60 @@ import { ensureWeaveInitialized, weave } from '@/lib/weave/client'
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY
 const MODEL = 'anthropic/claude-opus-4.5'
 
+// Weave-tracked logging functions
+const logLLMCall = weave.op(
+  async (data: {
+    model: string
+    sessionId: string
+    callNumber: number
+    latencyMs: number
+    finishReason: string
+    hasToolCalls: boolean
+    toolCallCount: number
+    usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null
+    inputMessages: number
+  }) => data,
+  { name: 'llm_call' }
+)
+
+const logLLMError = weave.op(
+  async (data: {
+    error: string
+    errorText: string
+    model: string
+    sessionId: string
+  }) => data,
+  { name: 'llm_error' }
+)
+
+const logToolExecution = weave.op(
+  async (data: {
+    toolName: string
+    toolCallId: string
+    sessionId: string
+    durationMs: number
+    inputArgs: Record<string, unknown>
+    outputSize: number
+    success: boolean
+  }) => data,
+  { name: 'tool_execution' }
+)
+
+const logAgentSession = weave.op(
+  async (data: {
+    sessionId: string
+    model: string
+    totalDurationMs: number
+    llmCallCount: number
+    toolCallCount: number
+    totalTokens: number
+    promptTokens: number
+    completionTokens: number
+    responseLength: number
+  }) => data,
+  { name: 'agent_session' }
+)
+
 interface Message {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
@@ -129,14 +183,12 @@ You have access to web_search to find current information from the internet. Use
     if (!response.ok) {
       const errorText = await response.text()
       // Log error to Weave
-      weave.op({
-        name: 'llm_error',
-      })(() => ({
+      await logLLMError({
         error: `OpenRouter API error: ${response.status}`,
         errorText,
         model: MODEL,
         sessionId,
-      }))()
+      })
       throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`)
     }
 
@@ -152,10 +204,7 @@ You have access to web_search to find current information from the internet. Use
     }
 
     // Log LLM call to Weave
-    const logLLMCall = weave.op({
-      name: 'llm_call',
-    })
-    logLLMCall(() => ({
+    await logLLMCall({
       model: MODEL,
       sessionId,
       callNumber: llmCallCount,
@@ -165,7 +214,7 @@ You have access to web_search to find current information from the internet. Use
       toolCallCount: message.tool_calls?.length || 0,
       usage: data.usage || null,
       inputMessages: allMessages.length,
-    }))()
+    })
 
     // Check if there are tool calls
     if (message.tool_calls && message.tool_calls.length > 0) {
@@ -196,10 +245,7 @@ You have access to web_search to find current information from the internet. Use
         const duration = Date.now() - startTime
 
         // Log tool execution to Weave
-        const logToolExecution = weave.op({
-          name: 'tool_execution',
-        })
-        logToolExecution(() => ({
+        await logToolExecution({
           toolName,
           toolCallId,
           sessionId,
@@ -207,7 +253,7 @@ You have access to web_search to find current information from the internet. Use
           inputArgs: args,
           outputSize: JSON.stringify(result).length,
           success: true,
-        }))()
+        })
 
         // Notify tool complete
         await onToolComplete?.(toolName, toolCallId, result)
@@ -260,10 +306,7 @@ You have access to web_search to find current information from the internet. Use
 
   // Log session summary to Weave
   const sessionDuration = Date.now() - sessionStartTime
-  const logSessionSummary = weave.op({
-    name: 'agent_session',
-  })
-  logSessionSummary(() => ({
+  await logAgentSession({
     sessionId,
     model: MODEL,
     totalDurationMs: sessionDuration,
@@ -273,7 +316,7 @@ You have access to web_search to find current information from the internet. Use
     promptTokens: totalUsage.prompt_tokens,
     completionTokens: totalUsage.completion_tokens,
     responseLength: finalContent.length,
-  }))()
+  })
 
   return { content: finalContent, usage: totalUsage }
 }
