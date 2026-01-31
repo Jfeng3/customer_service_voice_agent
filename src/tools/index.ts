@@ -4,6 +4,7 @@ import { toolDefinitions } from './definitions'
 import { knowledgeBaseSearch } from './knowledgeBase'
 import { faqLookup } from './faqLookup'
 import { orderLookup } from './orderLookup'
+import { webSearch } from './webSearch'
 
 export { toolDefinitions }
 
@@ -28,6 +29,13 @@ export async function executeTool(
 
     case 'order_lookup':
       return orderLookup(args.orderId as string, onProgress)
+
+    case 'web_search':
+      return webSearch(
+        args.query as string,
+        args.maxResults as number | undefined,
+        onProgress
+      )
 
     default:
       throw new Error(`Unknown tool: ${toolName}`)

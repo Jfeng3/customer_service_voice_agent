@@ -60,4 +60,26 @@ export const toolDefinitions = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'web_search',
+      description:
+        'Search the web for current information, news, or answers not available in the knowledge base. Use this when the customer asks about topics that require up-to-date information from the internet, or when internal tools do not have the answer.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The search query to find relevant information on the web',
+          },
+          maxResults: {
+            type: 'number',
+            description: 'Maximum number of results to return (default: 5)',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  },
 ]
