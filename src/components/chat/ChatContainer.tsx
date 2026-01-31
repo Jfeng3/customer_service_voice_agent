@@ -12,7 +12,7 @@ import { ToolProgressPanel } from '@/components/tools/ToolProgressPanel'
 
 export function ChatContainer() {
   const { messages, isLoading, sessionId, sendMessage, error } = useChat()
-  const { toolProgress, streamingMessage, isComplete, reset } = useRealtimeEvents(sessionId || null)
+  const { toolProgress, toolCalls, streamingMessage, isComplete, reset } = useRealtimeEvents(sessionId || null)
   const {
     isListening,
     transcript,
@@ -78,6 +78,7 @@ export function ChatContainer() {
         {/* Messages */}
         <MessageList
           messages={messages}
+          toolCalls={toolCalls}
           streamingMessage={streamingMessage}
           isLoading={isLoading}
         />

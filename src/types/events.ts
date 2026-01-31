@@ -53,3 +53,15 @@ export interface ToolProgress {
   progress: number
   message?: string
 }
+
+// Tool call record from database
+export interface ToolCallRecord {
+  id: string
+  session_id: string
+  tool_name: string
+  input: Record<string, unknown>
+  output: Record<string, unknown>
+  status: string
+  duration_ms: number
+  created_at: string
+}

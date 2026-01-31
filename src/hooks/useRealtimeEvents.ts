@@ -2,10 +2,11 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import type { ToolProgress } from '@/types/events'
+import type { ToolProgress, ToolCallRecord } from '@/types/events'
 
 interface UseRealtimeEventsReturn {
   toolProgress: ToolProgress | null
+  toolCalls: ToolCallRecord[]
   streamingMessage: string
   isComplete: boolean
   reset: () => void
@@ -13,11 +14,13 @@ interface UseRealtimeEventsReturn {
 
 export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsReturn {
   const [toolProgress, setToolProgress] = useState<ToolProgress | null>(null)
+  const [toolCalls, setToolCalls] = useState<ToolCallRecord[]>([])
   const [streamingMessage, setStreamingMessage] = useState('')
   const [isComplete, setIsComplete] = useState(false)
 
   const reset = useCallback(() => {
     setToolProgress(null)
+    setToolCalls([])
     setStreamingMessage('')
     setIsComplete(false)
   }, [])
@@ -61,6 +64,20 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
       .on('broadcast', { event: 'response:done' }, () => {
         setIsComplete(true)
       })
+      // Listen for tool calls inserted into database
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'csva_tool_calls',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          const newToolCall = payload.new as ToolCallRecord
+          setToolCalls((prev) => [...prev, newToolCall])
+        }
+      )
       .subscribe()
 
     return () => {
@@ -68,5 +85,5 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
     }
   }, [sessionId])
 
-  return { toolProgress, streamingMessage, isComplete, reset }
+  return { toolProgress, toolCalls, streamingMessage, isComplete, reset }
 }
