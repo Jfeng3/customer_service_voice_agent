@@ -45,6 +45,7 @@ Required in `.env.local`:
 ## Database Tables
 - `csva_messages` - Chat message history
 - `csva_tool_calls` - Tool execution logs
+- `csva_memories` - Long-term memory with vector embeddings (pgvector)
 
 ## Development
 ```bash

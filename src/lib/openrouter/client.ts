@@ -88,6 +88,7 @@ interface CallOpenRouterOptions {
   messages: { role: 'user' | 'assistant'; content: string }[]
   tools: ToolDefinition[]
   sessionId: string
+  memoryContext?: string
   onToolStart?: (toolName: string, toolCallId: string) => Promise<void>
   onToolProgress?: (
     toolName: string,
@@ -131,6 +132,7 @@ export async function callOpenRouter(
     messages,
     tools,
     sessionId,
+    memoryContext,
     onToolStart,
     onToolProgress,
     onToolComplete,
@@ -141,13 +143,20 @@ export async function callOpenRouter(
   // Initialize Weave for tracking
   await ensureWeaveInitialized()
 
+  // Build system prompt with memory context
+  let systemPrompt = `You are a helpful customer service agent. Be concise, friendly, and helpful.
+
+You have access to web_search to find current information from the internet. Use it when you need to look up information to answer the customer's question.`
+
+  if (memoryContext) {
+    systemPrompt += memoryContext
+  }
+
   // Build messages array with system prompt
   const allMessages: Message[] = [
     {
       role: 'system',
-      content: `You are a helpful customer service agent. Be concise, friendly, and helpful.
-
-You have access to web_search to find current information from the internet. Use it when you need to look up information to answer the customer's question.`,
+      content: systemPrompt,
     },
     ...messages,
   ]

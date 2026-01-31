@@ -3,6 +3,7 @@ import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
 import { supabaseAdmin, broadcastEvent } from '@/lib/supabase/server'
 import { callOpenRouter } from '@/lib/openrouter/client'
 import { executeTool, toolDefinitions } from '@/tools'
+import { getMemoryContext, extractAndStoreMemories } from '@/lib/memory/client'
 import type { Message } from '@/types/chat'
 
 interface WebhookPayload {
@@ -31,7 +32,23 @@ async function handler(request: NextRequest) {
       content: msg.content,
     }))
 
-    // 2. Call OpenRouter with tool support
+    // 2. Retrieve relevant memories for context
+    let memoryContext = ''
+    try {
+      memoryContext = await getMemoryContext({
+        query: message,
+        sessionId,
+        maxMemories: 5,
+      })
+      if (memoryContext) {
+        console.log('Retrieved memory context:', memoryContext)
+      }
+    } catch (error) {
+      console.error('Memory retrieval error:', error)
+      // Continue without memories if retrieval fails
+    }
+
+    // 3. Call OpenRouter with tool support
     let assistantResponse = ''
     const usedToolCallIds: string[] = []
 
@@ -40,6 +57,7 @@ async function handler(request: NextRequest) {
         messages: openRouterMessages,
         tools: toolDefinitions,
         sessionId,
+        memoryContext,
         onToolStart: async (toolName, toolCallId) => {
           await broadcastEvent(sessionId, 'tool:started', {
             toolName,
@@ -90,6 +108,18 @@ async function handler(request: NextRequest) {
       content: assistantResponse,
       tool_calls: usedToolCallIds.length > 0 ? usedToolCallIds : null,
     })
+
+    // 5. Extract and store memories from this conversation turn
+    try {
+      await extractAndStoreMemories({
+        sessionId,
+        userMessage: message,
+        assistantResponse,
+      })
+    } catch (error) {
+      console.error('Memory extraction error:', error)
+      // Continue even if memory storage fails
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
