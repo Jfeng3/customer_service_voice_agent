@@ -83,8 +83,8 @@ export async function callOpenRouter(
     {
       role: 'system',
       content: `You are a helpful customer service agent. Be concise, friendly, and helpful.
-When you need to look up information, use the available tools.
-Always provide accurate information based on tool results.`,
+
+You have access to web_search to find current information from the internet. Use it when you need to look up information to answer the customer's question.`,
     },
     ...messages,
   ]
