@@ -83,12 +83,20 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
+          console.log('📥 postgres_changes received:', payload)
           const record = payload.new as ToolCallRecord
-          setTools(prev => prev.map(tool =>
-            tool.toolCallId === record.tool_call_id
-              ? { ...tool, completed: record }
-              : tool
-          ))
+          console.log('📥 DB record:', {
+            tool_call_id: record.tool_call_id,
+            tool_name: record.tool_name,
+          })
+          setTools(prev => {
+            console.log('📥 Matching against tools:', prev.map(t => ({ toolCallId: t.toolCallId, toolName: t.toolName })))
+            return prev.map(tool =>
+              tool.toolCallId === record.tool_call_id
+                ? { ...tool, completed: record }
+                : tool
+            )
+          })
         }
       )
       .subscribe()
