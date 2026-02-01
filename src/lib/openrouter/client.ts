@@ -250,6 +250,8 @@ Be warm, helpful, and professional. If you don't know something, offer to connec
         const toolCallId = toolCall.id
         const args = JSON.parse(toolCall.function.arguments)
 
+        console.log('🔧 Executing tool:', { toolName, toolCallId, args })
+
         // Notify tool start
         await onToolStart?.(toolName, toolCallId)
 

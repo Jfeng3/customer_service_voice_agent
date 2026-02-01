@@ -39,6 +39,7 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
     const channel = supabase.channel(`session:${sessionId}`)
       // Tool started - add new tool to list
       .on('broadcast', { event: 'tool:started' }, ({ payload }) => {
+        console.log('🔧 tool:started received:', payload)
         setTools(prev => [
           ...prev,
           {
