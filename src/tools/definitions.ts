@@ -4,9 +4,31 @@ export const toolDefinitions = [
   {
     type: 'function' as const,
     function: {
+      name: 'knowledge_qa',
+      description:
+        'Search the Rainie Beauty knowledge base to answer customer questions about services, booking, pricing, location, and policies. ALWAYS use this tool FIRST for any questions about Rainie Beauty before using web search.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'The customer question or topic to search for in the Rainie Beauty knowledge base',
+          },
+          maxResults: {
+            type: 'number',
+            description: 'Maximum number of relevant answers to return (default: 3)',
+          },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'web_search',
       description:
-        'Search the web for current information, news, or answers. Use this tool to find up-to-date information from the internet.',
+        'Search the web for current information, news, or answers. Use this tool when information is not available in the Rainie Beauty knowledge base.',
       parameters: {
         type: 'object',
         properties: {

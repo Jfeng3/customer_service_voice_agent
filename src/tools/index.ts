@@ -3,6 +3,7 @@
 import { toolDefinitions } from './definitions'
 import { webSearch } from './webSearch'
 import { webFetch } from './webFetch'
+import { knowledgeQA } from './knowledgeQA'
 
 export { toolDefinitions }
 
@@ -15,6 +16,13 @@ export async function executeTool(
   onProgress?: ProgressCallback
 ): Promise<unknown> {
   switch (toolName) {
+    case 'knowledge_qa':
+      return knowledgeQA(
+        args.query as string,
+        args.maxResults as number | undefined,
+        onProgress
+      )
+
     case 'web_search':
       return webSearch(
         args.query as string,
