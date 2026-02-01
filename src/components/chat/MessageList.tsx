@@ -45,14 +45,14 @@ export function MessageList({
       {toolCalls.length > 0 && (
         <div className="space-y-2">
           {toolCalls.map((toolCall) => (
-            <ToolCallBubble key={toolCall.id} toolCall={toolCall} />
+            <ToolBubble key={toolCall.id} completed={toolCall} />
           ))}
         </div>
       )}
 
       {/* Tool in progress */}
       {toolProgress && (
-        <ToolProgressBubble toolProgress={toolProgress} />
+        <ToolBubble progress={toolProgress} />
       )}
 
       {/* Streaming message */}
@@ -165,59 +165,6 @@ function getToolColors(toolName: string): { bg: string; border: string; text: st
   }
 }
 
-function ToolProgressBubble({ toolProgress }: { toolProgress: ToolProgress }) {
-  const colors = getToolColors(toolProgress.toolName)
-  const isComplete = toolProgress.status === 'completed'
-
-  return (
-    <div className="flex justify-start">
-      <div className={`max-w-[90%] p-3 rounded-lg ${colors.bg} border ${colors.border}`}>
-        <div className="flex items-center gap-3">
-          {/* Icon with spinner or checkmark */}
-          <div className="relative">
-            <span className="text-lg">{getToolIcon(toolProgress.toolName)}</span>
-            {!isComplete && (
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            )}
-          </div>
-
-          {/* Tool info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className={`font-medium ${colors.text}`}>
-                {getToolLabel(toolProgress.toolName)}
-              </span>
-              {isComplete && (
-                <span className="text-green-500 text-sm">✓</span>
-              )}
-            </div>
-            {toolProgress.message && (
-              <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-                {toolProgress.message}
-              </p>
-            )}
-          </div>
-
-          {/* Progress bar */}
-          <div className="w-20 flex items-center gap-2">
-            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-300 ease-out ${
-                  isComplete ? 'bg-green-500' : 'bg-blue-500'
-                }`}
-                style={{ width: `${toolProgress.progress}%` }}
-              />
-            </div>
-            <span className="text-xs text-gray-500 w-7 text-right">
-              {toolProgress.progress}%
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 interface WebSearchResult {
   title: string
   url: string
@@ -231,79 +178,132 @@ interface KnowledgeResult {
   similarity: number
 }
 
-function ToolCallBubble({ toolCall }: { toolCall: ToolCallRecord }) {
-  const toolName = toolCall.tool_name
-  const query = toolCall.input?.query as string | undefined
+interface ToolBubbleProps {
+  // For in-progress state
+  progress?: ToolProgress
+  // For completed state
+  completed?: ToolCallRecord
+}
+
+function ToolBubble({ progress, completed }: ToolBubbleProps) {
+  const isInProgress = !!progress && !completed
+  const toolName = progress?.toolName || completed?.tool_name || 'unknown'
   const colors = getToolColors(toolName)
 
   const renderResults = () => {
-    if (toolName === 'knowledge_qa') {
-      const results = toolCall.output?.results as KnowledgeResult[] | undefined
-      if (!results || results.length === 0) return null
+    if (!completed) return null
 
+    const query = completed.input?.query as string | undefined
+
+    if (toolName === 'knowledge_qa') {
+      const results = completed.output?.results as KnowledgeResult[] | undefined
       return (
-        <div className="space-y-2">
-          {results.slice(0, 3).map((result, idx) => (
-            <div key={idx} className="text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
-                  {result.category}
-                </span>
-                <span className="text-xs text-gray-400">
-                  {Math.round(result.similarity * 100)}% match
-                </span>
-              </div>
-              <p className="text-gray-700 dark:text-gray-300 text-sm line-clamp-3">
-                {result.content}
-              </p>
+        <>
+          {query && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Query: &quot;{query}&quot;
+            </p>
+          )}
+          {results && results.length > 0 && (
+            <div className="space-y-2">
+              {results.slice(0, 3).map((result, idx) => (
+                <div key={idx} className="text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                      {result.category}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {Math.round(result.similarity * 100)}% match
+                    </span>
+                  </div>
+                  <p className="text-gray-700 dark:text-gray-300 text-sm line-clamp-3">
+                    {result.content}
+                  </p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )
     }
 
     // web_search and web_fetch results
-    const results = toolCall.output?.results as WebSearchResult[] | undefined
-    if (!results || results.length === 0) return null
-
+    const results = completed.output?.results as WebSearchResult[] | undefined
     return (
-      <div className="space-y-2">
-        {results.slice(0, 3).map((result, idx) => (
-          <div key={idx} className="text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
-            <a
-              href={result.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              {result.title}
-            </a>
-            <p className="text-gray-600 dark:text-gray-400 text-xs mt-1 line-clamp-2">
-              {result.content}
-            </p>
+      <>
+        {query && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+            Searched: &quot;{query}&quot;
+          </p>
+        )}
+        {results && results.length > 0 && (
+          <div className="space-y-2">
+            {results.slice(0, 3).map((result, idx) => (
+              <div key={idx} className="text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
+                <a
+                  href={result.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  {result.title}
+                </a>
+                <p className="text-gray-600 dark:text-gray-400 text-xs mt-1 line-clamp-2">
+                  {result.content}
+                </p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        )}
+      </>
     )
   }
 
   return (
     <div className="flex justify-start">
       <div className={`max-w-[90%] p-3 rounded-lg ${colors.bg} border ${colors.border}`}>
+        {/* Header */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-lg">{getToolIcon(toolCall.tool_name)}</span>
-          <span className={`font-medium ${colors.text}`}>{getToolLabel(toolCall.tool_name)}</span>
-          <span className={`text-xs ${colors.accent}`}>
-            {toolCall.duration_ms}ms
-          </span>
+          <div className="relative">
+            <span className="text-lg">{getToolIcon(toolName)}</span>
+            {isInProgress && (
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            )}
+          </div>
+          <span className={`font-medium ${colors.text}`}>{getToolLabel(toolName)}</span>
+          {completed && (
+            <span className={`text-xs ${colors.accent}`}>
+              {completed.duration_ms}ms
+            </span>
+          )}
+          {!isInProgress && completed && (
+            <span className="text-green-500 text-sm">✓</span>
+          )}
         </div>
 
-        {query && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-            {toolCall.tool_name === 'knowledge_qa' ? 'Query' : 'Searched'}: &quot;{query}&quot;
+        {/* Progress bar (only when in progress) */}
+        {isInProgress && progress && (
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+              <div
+                className="h-full transition-all duration-300 ease-out bg-blue-500"
+                style={{ width: `${progress.progress}%` }}
+              />
+            </div>
+            <span className="text-xs text-gray-500 w-7 text-right">
+              {progress.progress}%
+            </span>
+          </div>
+        )}
+
+        {/* Status message (only when in progress) */}
+        {isInProgress && progress?.message && (
+          <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+            {progress.message}
           </p>
         )}
 
+        {/* Results (only when completed) */}
         {renderResults()}
       </div>
     </div>
