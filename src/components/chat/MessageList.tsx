@@ -172,9 +172,19 @@ interface KnowledgeResult {
 }
 
 function ToolBubble({ tool }: { tool: UnifiedToolState }) {
-  const { toolName, status, progress, message, completed } = tool
+  const { toolName: broadcastToolName, status, progress, message, completed } = tool
+  // Prefer DB tool_name (accurate) over broadcast toolName
+  const toolName = completed?.tool_name || broadcastToolName
   const isInProgress = status !== 'completed' || !completed
   const colors = getToolColors(toolName)
+
+  console.log('🎨 ToolBubble render:', {
+    broadcastToolName,
+    dbToolName: completed?.tool_name,
+    finalToolName: toolName,
+    status,
+    hasCompleted: !!completed
+  })
 
   const renderResults = () => {
     if (!completed) return null
