@@ -13,6 +13,19 @@ function formatToolName(name: string): string {
     .join(' ')
 }
 
+function getToolIcon(name: string): string {
+  switch (name) {
+    case 'knowledge_qa':
+      return '📚'
+    case 'web_search':
+      return '🌐'
+    case 'web_fetch':
+      return '📄'
+    default:
+      return '🔧'
+  }
+}
+
 export function ToolProgressPanel({ toolProgress }: ToolProgressPanelProps) {
   if (!toolProgress) return null
 
@@ -30,7 +43,7 @@ export function ToolProgressPanel({ toolProgress }: ToolProgressPanelProps) {
       {/* Tool info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-lg">🌐</span>
+          <span className="text-lg">{getToolIcon(toolProgress.toolName)}</span>
           <span className="font-medium text-gray-900 dark:text-gray-100">
             {formatToolName(toolProgress.toolName)}
           </span>
