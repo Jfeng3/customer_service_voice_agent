@@ -158,10 +158,73 @@ function getToolColors(toolName: string): { bg: string; border: string; text: st
   }
 }
 
+interface WebSearchResult {
+  title: string
+  url: string
+  content: string
+  score?: number
+}
+
+interface KnowledgeResult {
+  content: string
+  category: string
+  similarity: number
+}
+
 function ToolCallBubble({ toolCall }: { toolCall: ToolCallRecord }) {
   const query = toolCall.input?.query as string | undefined
-  const results = toolCall.output?.results as Array<{ title: string; url: string; content: string }> | undefined
   const colors = getToolColors(toolCall.tool_name)
+
+  const renderResults = () => {
+    if (toolCall.tool_name === 'knowledge_qa') {
+      const results = toolCall.output?.results as KnowledgeResult[] | undefined
+      if (!results || results.length === 0) return null
+
+      return (
+        <div className="space-y-2">
+          {results.slice(0, 3).map((result, idx) => (
+            <div key={idx} className="text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                  {result.category}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {Math.round(result.similarity * 100)}% match
+                </span>
+              </div>
+              <p className="text-gray-700 dark:text-gray-300 text-sm line-clamp-3">
+                {result.content}
+              </p>
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    // web_search and web_fetch results
+    const results = toolCall.output?.results as WebSearchResult[] | undefined
+    if (!results || results.length === 0) return null
+
+    return (
+      <div className="space-y-2">
+        {results.slice(0, 3).map((result, idx) => (
+          <div key={idx} className="text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
+            <a
+              href={result.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              {result.title}
+            </a>
+            <p className="text-gray-600 dark:text-gray-400 text-xs mt-1 line-clamp-2">
+              {result.content}
+            </p>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="flex justify-start">
@@ -180,31 +243,7 @@ function ToolCallBubble({ toolCall }: { toolCall: ToolCallRecord }) {
           </p>
         )}
 
-        {results && results.length > 0 && (
-          <div className="space-y-2">
-            {results.slice(0, 3).map((result, idx) => (
-              <div key={idx} className="text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
-                {result.url ? (
-                  <a
-                    href={result.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {result.title}
-                  </a>
-                ) : (
-                  <span className="font-medium text-gray-800 dark:text-gray-200">
-                    {result.title}
-                  </span>
-                )}
-                <p className="text-gray-600 dark:text-gray-400 text-xs mt-1 line-clamp-2">
-                  {result.content}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
+        {renderResults()}
       </div>
     </div>
   )
