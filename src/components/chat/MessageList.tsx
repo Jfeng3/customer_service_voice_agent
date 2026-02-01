@@ -99,24 +99,84 @@ function MessageBubble({ message }: { message: Message }) {
   )
 }
 
+function getToolIcon(toolName: string): string {
+  switch (toolName) {
+    case 'knowledge_qa':
+      return '📚'
+    case 'web_search':
+      return '🌐'
+    case 'web_fetch':
+      return '📄'
+    default:
+      return '🔧'
+  }
+}
+
+function getToolLabel(toolName: string): string {
+  switch (toolName) {
+    case 'knowledge_qa':
+      return 'Knowledge Base'
+    case 'web_search':
+      return 'Web Search'
+    case 'web_fetch':
+      return 'Web Fetch'
+    default:
+      return toolName.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  }
+}
+
+function getToolColors(toolName: string): { bg: string; border: string; text: string; accent: string } {
+  switch (toolName) {
+    case 'knowledge_qa':
+      return {
+        bg: 'bg-purple-50 dark:bg-purple-900/20',
+        border: 'border-purple-200 dark:border-purple-800',
+        text: 'text-purple-700 dark:text-purple-300',
+        accent: 'text-purple-500 dark:text-purple-400'
+      }
+    case 'web_search':
+      return {
+        bg: 'bg-blue-50 dark:bg-blue-900/20',
+        border: 'border-blue-200 dark:border-blue-800',
+        text: 'text-blue-700 dark:text-blue-300',
+        accent: 'text-blue-500 dark:text-blue-400'
+      }
+    case 'web_fetch':
+      return {
+        bg: 'bg-green-50 dark:bg-green-900/20',
+        border: 'border-green-200 dark:border-green-800',
+        text: 'text-green-700 dark:text-green-300',
+        accent: 'text-green-500 dark:text-green-400'
+      }
+    default:
+      return {
+        bg: 'bg-gray-50 dark:bg-gray-900/20',
+        border: 'border-gray-200 dark:border-gray-800',
+        text: 'text-gray-700 dark:text-gray-300',
+        accent: 'text-gray-500 dark:text-gray-400'
+      }
+  }
+}
+
 function ToolCallBubble({ toolCall }: { toolCall: ToolCallRecord }) {
   const query = toolCall.input?.query as string | undefined
   const results = toolCall.output?.results as Array<{ title: string; url: string; content: string }> | undefined
+  const colors = getToolColors(toolCall.tool_name)
 
   return (
     <div className="flex justify-start">
-      <div className="max-w-[90%] p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+      <div className={`max-w-[90%] p-3 rounded-lg ${colors.bg} border ${colors.border}`}>
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-lg">🌐</span>
-          <span className="font-medium text-blue-700 dark:text-blue-300">Web Search</span>
-          <span className="text-xs text-blue-500 dark:text-blue-400">
+          <span className="text-lg">{getToolIcon(toolCall.tool_name)}</span>
+          <span className={`font-medium ${colors.text}`}>{getToolLabel(toolCall.tool_name)}</span>
+          <span className={`text-xs ${colors.accent}`}>
             {toolCall.duration_ms}ms
           </span>
         </div>
 
         {query && (
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-            Searched: &quot;{query}&quot;
+            {toolCall.tool_name === 'knowledge_qa' ? 'Query' : 'Searched'}: &quot;{query}&quot;
           </p>
         )}
 
@@ -124,14 +184,20 @@ function ToolCallBubble({ toolCall }: { toolCall: ToolCallRecord }) {
           <div className="space-y-2">
             {results.slice(0, 3).map((result, idx) => (
               <div key={idx} className="text-sm bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
-                <a
-                  href={result.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {result.title}
-                </a>
+                {result.url ? (
+                  <a
+                    href={result.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {result.title}
+                  </a>
+                ) : (
+                  <span className="font-medium text-gray-800 dark:text-gray-200">
+                    {result.title}
+                  </span>
+                )}
                 <p className="text-gray-600 dark:text-gray-400 text-xs mt-1 line-clamp-2">
                   {result.content}
                 </p>
