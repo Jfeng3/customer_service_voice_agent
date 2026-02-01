@@ -2,11 +2,12 @@
 
 import { useEffect, useRef } from 'react'
 import type { Message } from '@/types/chat'
-import type { ToolCallRecord } from '@/types/events'
+import type { ToolCallRecord, ToolProgress } from '@/types/events'
 
 interface MessageListProps {
   messages: Message[]
   toolCalls: ToolCallRecord[]
+  toolProgress: ToolProgress | null
   streamingMessage: string
   isLoading: boolean
 }
@@ -14,6 +15,7 @@ interface MessageListProps {
 export function MessageList({
   messages,
   toolCalls,
+  toolProgress,
   streamingMessage,
   isLoading,
 }: MessageListProps) {
@@ -22,7 +24,7 @@ export function MessageList({
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, toolCalls, streamingMessage])
+  }, [messages, toolCalls, toolProgress, streamingMessage])
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -46,6 +48,11 @@ export function MessageList({
             <ToolCallBubble key={toolCall.id} toolCall={toolCall} />
           ))}
         </div>
+      )}
+
+      {/* Tool in progress */}
+      {toolProgress && (
+        <ToolProgressBubble toolProgress={toolProgress} />
       )}
 
       {/* Streaming message */}
@@ -158,6 +165,59 @@ function getToolColors(toolName: string): { bg: string; border: string; text: st
   }
 }
 
+function ToolProgressBubble({ toolProgress }: { toolProgress: ToolProgress }) {
+  const colors = getToolColors(toolProgress.toolName)
+  const isComplete = toolProgress.status === 'completed'
+
+  return (
+    <div className="flex justify-start">
+      <div className={`max-w-[90%] p-3 rounded-lg ${colors.bg} border ${colors.border}`}>
+        <div className="flex items-center gap-3">
+          {/* Icon with spinner or checkmark */}
+          <div className="relative">
+            <span className="text-lg">{getToolIcon(toolProgress.toolName)}</span>
+            {!isComplete && (
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            )}
+          </div>
+
+          {/* Tool info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className={`font-medium ${colors.text}`}>
+                {getToolLabel(toolProgress.toolName)}
+              </span>
+              {isComplete && (
+                <span className="text-green-500 text-sm">✓</span>
+              )}
+            </div>
+            {toolProgress.message && (
+              <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                {toolProgress.message}
+              </p>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-20 flex items-center gap-2">
+            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ease-out ${
+                  isComplete ? 'bg-green-500' : 'bg-blue-500'
+                }`}
+                style={{ width: `${toolProgress.progress}%` }}
+              />
+            </div>
+            <span className="text-xs text-gray-500 w-7 text-right">
+              {toolProgress.progress}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface WebSearchResult {
   title: string
   url: string
@@ -172,14 +232,12 @@ interface KnowledgeResult {
 }
 
 function ToolCallBubble({ toolCall }: { toolCall: ToolCallRecord }) {
-  // Debug: log tool_name to verify correct value
-  console.log('ToolCallBubble:', toolCall.tool_name, toolCall)
-
+  const toolName = toolCall.tool_name
   const query = toolCall.input?.query as string | undefined
-  const colors = getToolColors(toolCall.tool_name)
+  const colors = getToolColors(toolName)
 
   const renderResults = () => {
-    if (toolCall.tool_name === 'knowledge_qa') {
+    if (toolName === 'knowledge_qa') {
       const results = toolCall.output?.results as KnowledgeResult[] | undefined
       if (!results || results.length === 0) return null
 

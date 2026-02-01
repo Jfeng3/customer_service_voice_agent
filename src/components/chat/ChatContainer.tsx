@@ -8,7 +8,6 @@ import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { VoiceInput } from '@/components/voice/VoiceInput'
 import { VoiceIndicator } from '@/components/voice/VoiceIndicator'
-import { ToolProgressPanel } from '@/components/tools/ToolProgressPanel'
 
 export function ChatContainer() {
   const { messages, isLoading, sessionId, sendMessage, error } = useChat()
@@ -79,16 +78,10 @@ export function ChatContainer() {
         <MessageList
           messages={messages}
           toolCalls={toolCalls}
+          toolProgress={toolProgress}
           streamingMessage={streamingMessage}
           isLoading={isLoading}
         />
-
-        {/* Tool progress - shown above input when active */}
-        {toolProgress && (
-          <div className="px-4 py-3 border-t dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
-            <ToolProgressPanel toolProgress={toolProgress} />
-          </div>
-        )}
 
         {/* Input area */}
         <div className="flex items-end gap-4 p-4 border-t dark:border-gray-700">
