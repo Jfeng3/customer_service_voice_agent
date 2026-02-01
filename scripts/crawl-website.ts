@@ -3,7 +3,7 @@
 
 import { config } from 'dotenv'
 import { createClient } from '@supabase/supabase-js'
-import FirecrawlApp from '@mendable/firecrawl-js'
+import Firecrawl from '@mendable/firecrawl-js'
 
 // Load environment variables
 config({ path: '.env.local' })
@@ -15,7 +15,6 @@ const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY!
 const EMBEDDING_MODEL = 'openai/text-embedding-3-small'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY)
-const firecrawl = new FirecrawlApp({ apiKey: FIRECRAWL_API_KEY })
 
 async function generateEmbedding(text: string): Promise<number[]> {
   const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
@@ -103,9 +102,12 @@ async function crawlAndStore(url: string) {
   }
 
   try {
-    // Crawl the website
+    // Initialize Firecrawl with v1 API
+    const firecrawl = new Firecrawl({ apiKey: FIRECRAWL_API_KEY })
+
+    // Crawl the website using v1 API
     console.log('Crawling website...')
-    const crawlResult = await firecrawl.crawlUrl(url, {
+    const crawlResult = await firecrawl.v1.crawlUrl(url, {
       limit: 10, // Limit pages to crawl
       scrapeOptions: {
         formats: ['markdown'],
@@ -113,7 +115,7 @@ async function crawlAndStore(url: string) {
     })
 
     if (!crawlResult.success) {
-      throw new Error(`Crawl failed: ${crawlResult.error}`)
+      throw new Error(`Crawl failed: ${(crawlResult as any).error}`)
     }
 
     console.log(`\nCrawled ${crawlResult.data?.length || 0} pages\n`)
