@@ -11,7 +11,7 @@ import { VoiceIndicator } from '@/components/voice/VoiceIndicator'
 
 export function ChatContainer() {
   const { messages, isLoading, sessionId, sendMessage, error } = useChat()
-  const { toolProgress, toolCalls, streamingMessage, isComplete, reset } = useRealtimeEvents(sessionId || null)
+  const { tools, streamingMessage, isComplete, reset } = useRealtimeEvents(sessionId || null)
   const {
     isListening,
     transcript,
@@ -77,8 +77,7 @@ export function ChatContainer() {
         {/* Messages */}
         <MessageList
           messages={messages}
-          toolCalls={toolCalls}
-          toolProgress={toolProgress}
+          tools={tools}
           streamingMessage={streamingMessage}
           isLoading={isLoading}
         />

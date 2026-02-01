@@ -2,25 +2,33 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import type { ToolProgress, ToolCallRecord } from '@/types/events'
+import type { ToolCallRecord } from '@/types/events'
+
+// Unified tool state - tracks both progress and completed results
+export interface UnifiedToolState {
+  toolCallId: string
+  toolName: string
+  status: 'started' | 'progress' | 'completed'
+  progress: number
+  message?: string
+  // Completed data (from DB)
+  completed?: ToolCallRecord
+}
 
 interface UseRealtimeEventsReturn {
-  toolProgress: ToolProgress | null
-  toolCalls: ToolCallRecord[]
+  tools: UnifiedToolState[]
   streamingMessage: string
   isComplete: boolean
   reset: () => void
 }
 
 export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsReturn {
-  const [toolProgress, setToolProgress] = useState<ToolProgress | null>(null)
-  const [toolCalls, setToolCalls] = useState<ToolCallRecord[]>([])
+  const [tools, setTools] = useState<UnifiedToolState[]>([])
   const [streamingMessage, setStreamingMessage] = useState('')
   const [isComplete, setIsComplete] = useState(false)
 
   const reset = useCallback(() => {
-    setToolProgress(null)
-    setToolCalls([])
+    setTools([])
     setStreamingMessage('')
     setIsComplete(false)
   }, [])
@@ -29,33 +37,33 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
     if (!sessionId) return
 
     const channel = supabase.channel(`session:${sessionId}`)
-      // Tool events
+      // Tool started - add new tool to list
       .on('broadcast', { event: 'tool:started' }, ({ payload }) => {
-        setToolProgress({
-          toolName: payload.toolName,
-          toolCallId: payload.toolCallId,
-          status: 'started',
-          progress: 0,
-        })
+        setTools(prev => [
+          ...prev,
+          {
+            toolCallId: payload.toolCallId,
+            toolName: payload.toolName,
+            status: 'started',
+            progress: 0,
+          }
+        ])
       })
+      // Tool progress - update existing tool
       .on('broadcast', { event: 'tool:progress' }, ({ payload }) => {
-        setToolProgress({
-          toolName: payload.toolName,
-          toolCallId: payload.toolCallId,
-          status: 'progress',
-          progress: payload.progress,
-          message: payload.message,
-        })
+        setTools(prev => prev.map(tool =>
+          tool.toolCallId === payload.toolCallId
+            ? { ...tool, status: 'progress', progress: payload.progress, message: payload.message }
+            : tool
+        ))
       })
+      // Tool completed - update status to completed
       .on('broadcast', { event: 'tool:completed' }, ({ payload }) => {
-        setToolProgress({
-          toolName: payload.toolName,
-          toolCallId: payload.toolCallId,
-          status: 'completed',
-          progress: 100,
-        })
-        // Clear tool progress after a short delay
-        setTimeout(() => setToolProgress(null), 2000)
+        setTools(prev => prev.map(tool =>
+          tool.toolCallId === payload.toolCallId
+            ? { ...tool, status: 'completed', progress: 100 }
+            : tool
+        ))
       })
       // Response events
       .on('broadcast', { event: 'response:chunk' }, ({ payload }) => {
@@ -64,7 +72,7 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
       .on('broadcast', { event: 'response:done' }, () => {
         setIsComplete(true)
       })
-      // Listen for tool calls inserted into database
+      // DB insert - merge completed data into existing tool
       .on(
         'postgres_changes',
         {
@@ -74,8 +82,12 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          const newToolCall = payload.new as ToolCallRecord
-          setToolCalls((prev) => [...prev, newToolCall])
+          const record = payload.new as ToolCallRecord
+          setTools(prev => prev.map(tool =>
+            tool.toolCallId === record.tool_call_id
+              ? { ...tool, completed: record }
+              : tool
+          ))
         }
       )
       .subscribe()
@@ -85,5 +97,5 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
     }
   }, [sessionId])
 
-  return { toolProgress, toolCalls, streamingMessage, isComplete, reset }
+  return { tools, streamingMessage, isComplete, reset }
 }

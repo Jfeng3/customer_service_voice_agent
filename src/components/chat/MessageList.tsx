@@ -2,20 +2,18 @@
 
 import { useEffect, useRef } from 'react'
 import type { Message } from '@/types/chat'
-import type { ToolCallRecord, ToolProgress } from '@/types/events'
+import type { UnifiedToolState } from '@/hooks/useRealtimeEvents'
 
 interface MessageListProps {
   messages: Message[]
-  toolCalls: ToolCallRecord[]
-  toolProgress: ToolProgress | null
+  tools: UnifiedToolState[]
   streamingMessage: string
   isLoading: boolean
 }
 
 export function MessageList({
   messages,
-  toolCalls,
-  toolProgress,
+  tools,
   streamingMessage,
   isLoading,
 }: MessageListProps) {
@@ -24,7 +22,7 @@ export function MessageList({
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, toolCalls, toolProgress, streamingMessage])
+  }, [messages, tools, streamingMessage])
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -41,18 +39,13 @@ export function MessageList({
         <MessageBubble key={message.id} message={message} />
       ))}
 
-      {/* Tool calls display */}
-      {toolCalls.length > 0 && (
+      {/* Tools display (unified: progress + completed) */}
+      {tools.length > 0 && (
         <div className="space-y-2">
-          {toolCalls.map((toolCall) => (
-            <ToolBubble key={toolCall.id} completed={toolCall} />
+          {tools.map((tool) => (
+            <ToolBubble key={tool.toolCallId} tool={tool} />
           ))}
         </div>
-      )}
-
-      {/* Tool in progress */}
-      {toolProgress && (
-        <ToolBubble progress={toolProgress} />
       )}
 
       {/* Streaming message */}
@@ -66,7 +59,7 @@ export function MessageList({
       )}
 
       {/* Loading indicator */}
-      {isLoading && !streamingMessage && toolCalls.length === 0 && (
+      {isLoading && !streamingMessage && tools.length === 0 && (
         <div className="flex justify-start">
           <div className="max-w-[80%] p-3 rounded-lg bg-gray-100 dark:bg-gray-700">
             <div className="flex items-center gap-2">
@@ -178,16 +171,9 @@ interface KnowledgeResult {
   similarity: number
 }
 
-interface ToolBubbleProps {
-  // For in-progress state
-  progress?: ToolProgress
-  // For completed state
-  completed?: ToolCallRecord
-}
-
-function ToolBubble({ progress, completed }: ToolBubbleProps) {
-  const isInProgress = !!progress && !completed
-  const toolName = progress?.toolName || completed?.tool_name || 'unknown'
+function ToolBubble({ tool }: { tool: UnifiedToolState }) {
+  const { toolName, status, progress, message, completed } = tool
+  const isInProgress = status !== 'completed' || !completed
   const colors = getToolColors(toolName)
 
   const renderResults = () => {
@@ -276,30 +262,30 @@ function ToolBubble({ progress, completed }: ToolBubbleProps) {
               {completed.duration_ms}ms
             </span>
           )}
-          {!isInProgress && completed && (
+          {!isInProgress && (
             <span className="text-green-500 text-sm">✓</span>
           )}
         </div>
 
         {/* Progress bar (only when in progress) */}
-        {isInProgress && progress && (
+        {isInProgress && (
           <div className="flex items-center gap-2 mb-2">
             <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden">
               <div
                 className="h-full transition-all duration-300 ease-out bg-blue-500"
-                style={{ width: `${progress.progress}%` }}
+                style={{ width: `${progress}%` }}
               />
             </div>
             <span className="text-xs text-gray-500 w-7 text-right">
-              {progress.progress}%
+              {progress}%
             </span>
           </div>
         )}
 
         {/* Status message (only when in progress) */}
-        {isInProgress && progress?.message && (
+        {isInProgress && message && (
           <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
-            {progress.message}
+            {message}
           </p>
         )}
 
