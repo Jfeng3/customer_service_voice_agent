@@ -172,6 +172,9 @@ interface KnowledgeResult {
 }
 
 function ToolCallBubble({ toolCall }: { toolCall: ToolCallRecord }) {
+  // Debug: log tool_name to verify correct value
+  console.log('ToolCallBubble:', toolCall.tool_name, toolCall)
+
   const query = toolCall.input?.query as string | undefined
   const colors = getToolColors(toolCall.tool_name)
 
