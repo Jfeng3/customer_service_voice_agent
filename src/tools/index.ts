@@ -2,6 +2,7 @@
 
 import { toolDefinitions } from './definitions'
 import { webSearch } from './webSearch'
+import { webFetch } from './webFetch'
 
 export { toolDefinitions }
 
@@ -18,6 +19,12 @@ export async function executeTool(
       return webSearch(
         args.query as string,
         args.maxResults as number | undefined,
+        onProgress
+      )
+
+    case 'web_fetch':
+      return webFetch(
+        args.url as string,
         onProgress
       )
 
