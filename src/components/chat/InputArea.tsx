@@ -44,8 +44,8 @@ export function InputArea({
   const hasInput = input.trim().length > 0
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-3">
-      <div className="flex-1 relative">
+    <form onSubmit={handleSubmit} className="flex items-end gap-2 sm:gap-3">
+      <div className="flex-1 relative min-w-0">
         <textarea
           ref={textareaRef}
           value={input}
@@ -55,17 +55,17 @@ export function InputArea({
           disabled={disabled}
           rows={1}
           className={`
-            w-full resize-none rounded-2xl
+            w-full resize-none rounded-xl sm:rounded-2xl
             bg-transparent
-            px-4 py-3
-            text-[var(--foreground)]
+            px-3 sm:px-4 py-2.5 sm:py-3
+            text-sm sm:text-base text-[var(--foreground)]
             placeholder:text-[var(--foreground)] placeholder:opacity-40
             focus:outline-none
             disabled:opacity-50 disabled:cursor-not-allowed
             transition-all duration-200
           `}
           style={{
-            minHeight: '48px',
+            minHeight: '44px',
             maxHeight: '120px',
           }}
         />
@@ -77,7 +77,7 @@ export function InputArea({
         disabled={disabled || !hasInput}
         className={`
           relative flex-shrink-0
-          w-12 h-12 rounded-2xl
+          w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl
           flex items-center justify-center
           transition-all duration-300 ease-out
           focus-ring
@@ -90,7 +90,7 @@ export function InputArea({
       >
         {/* Send icon */}
         <svg
-          className={`w-5 h-5 transition-all duration-200 ${
+          className={`w-4 h-4 sm:w-5 sm:h-5 transition-all duration-200 ${
             hasInput && !disabled ? 'text-white' : 'text-[var(--foreground)] opacity-30'
           }`}
           viewBox="0 0 24 24"
@@ -108,7 +108,7 @@ export function InputArea({
         {/* Highlight effect */}
         {hasInput && !disabled && (
           <div
-            className="absolute inset-[2px] rounded-xl opacity-30"
+            className="absolute inset-[2px] rounded-lg sm:rounded-xl opacity-30"
             style={{
               background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%)',
             }}

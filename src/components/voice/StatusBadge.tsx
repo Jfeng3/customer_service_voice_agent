@@ -55,7 +55,7 @@ export function StatusBadge({ state, onStopSpeaking }: StatusBadgeProps) {
   return (
     <div
       className={`
-        flex items-center gap-2 px-3 py-1.5 rounded-full
+        flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full
         ${config.bgColor} border ${config.borderColor}
         animate-fade-in
       `}
@@ -96,7 +96,7 @@ export function StatusBadge({ state, onStopSpeaking }: StatusBadgeProps) {
       </div>
 
       {/* Status text */}
-      <span className={`text-sm font-medium font-display ${config.textColor}`}>
+      <span className={`text-xs sm:text-sm font-medium font-display ${config.textColor}`}>
         {config.label}
       </span>
 

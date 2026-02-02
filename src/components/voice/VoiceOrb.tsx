@@ -123,7 +123,7 @@ export function VoiceOrb({
         onTouchEnd={onStop}
         disabled={disabled}
         className={`
-          relative w-14 h-14 rounded-full
+          relative w-12 h-12 sm:w-14 sm:h-14 rounded-full
           flex items-center justify-center
           transition-all duration-300 ease-out
           focus-ring
@@ -182,7 +182,7 @@ export function VoiceOrb({
 function MicrophoneIcon({ isActive }: { isActive: boolean }) {
   return (
     <svg
-      className={`w-6 h-6 text-white transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}
+      className={`w-5 h-5 sm:w-6 sm:h-6 text-white transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -233,6 +233,6 @@ function ThinkingIcon() {
 
 function TranscribingIcon() {
   return (
-    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+    <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
   )
 }

@@ -59,11 +59,11 @@ export function MessageList({
   }
 
   return (
-    <div ref={containerRef} className="h-full overflow-y-auto px-6 py-4">
+    <div ref={containerRef} className="h-full overflow-y-auto px-3 sm:px-6 py-3 sm:py-4">
       {isEmpty ? (
         <WelcomeScreen />
       ) : (
-        <div className="space-y-4 max-w-3xl mx-auto">
+        <div className="space-y-3 sm:space-y-4 max-w-3xl mx-auto">
           {messages.flatMap((message, index) => renderMessageWithTools(message, index))}
 
           {/* Active tools display (for current request) */}
@@ -78,7 +78,7 @@ export function MessageList({
           {/* Streaming message */}
           {streamingMessage && (
             <div className="flex justify-start animate-fade-in-up">
-              <div className="relative max-w-[85%]">
+              <div className="relative max-w-[90%] sm:max-w-[85%]">
                 <AssistantBubble>
                   {streamingMessage}
                   <span className="inline-block w-[2px] h-4 ml-1 bg-[var(--accent-primary)] animate-cursor-blink" />
@@ -90,19 +90,19 @@ export function MessageList({
           {/* Loading indicator */}
           {isLoading && !streamingMessage && activeTools.length === 0 && (
             <div className="flex justify-start animate-fade-in-up">
-              <div className="relative max-w-[85%]">
+              <div className="relative max-w-[90%] sm:max-w-[85%]">
                 <AssistantBubble>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <div className="flex gap-1">
                       {[1, 2, 3].map((i) => (
                         <span
                           key={i}
-                          className="w-2 h-2 bg-[var(--accent-primary)] rounded-full animate-bounce"
+                          className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-[var(--accent-primary)] rounded-full animate-bounce"
                           style={{ animationDelay: `${i * 0.15}s` }}
                         />
                       ))}
                     </div>
-                    <span className="text-sm text-[var(--foreground)] opacity-60 font-display">
+                    <span className="text-xs sm:text-sm text-[var(--foreground)] opacity-60 font-display">
                       Processing your request...
                     </span>
                   </div>
@@ -122,27 +122,27 @@ function WelcomeScreen() {
   return (
     <div className="h-full flex flex-col items-center justify-center text-center px-4 animate-fade-in">
       {/* Decorative element */}
-      <div className="relative mb-8">
+      <div className="relative mb-6 sm:mb-8">
         <div
-          className="w-24 h-24 rounded-3xl rotate-12 animate-float"
+          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl rotate-12 animate-float"
           style={{
             background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
             boxShadow: 'var(--shadow-glow-accent)',
           }}
         />
         <div
-          className="absolute inset-2 rounded-2xl bg-[var(--surface)] flex items-center justify-center rotate-12"
+          className="absolute inset-2 rounded-xl sm:rounded-2xl bg-[var(--surface)] flex items-center justify-center rotate-12"
         >
-          <svg className="w-10 h-10 text-[var(--accent-primary)] -rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <svg className="w-8 h-8 sm:w-10 sm:h-10 text-[var(--accent-primary)] -rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
         </div>
       </div>
 
-      <h2 className="font-display text-2xl font-semibold text-[var(--foreground)] mb-3">
+      <h2 className="font-display text-xl sm:text-2xl font-semibold text-[var(--foreground)] mb-2 sm:mb-3">
         Welcome to Rainie Beauty
       </h2>
-      <p className="text-[var(--foreground)] opacity-60 max-w-md mb-8">
+      <p className="text-sm sm:text-base text-[var(--foreground)] opacity-60 max-w-md mb-6 sm:mb-8 px-2">
         I&apos;m your front desk assistant. Book appointments, ask about our services, or get directions to our salon.
       </p>
 
@@ -152,8 +152,8 @@ function WelcomeScreen() {
           <div
             key={action}
             className={`
-              px-4 py-2 rounded-full border border-[var(--border)]
-              text-sm text-[var(--foreground)] opacity-70
+              px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-[var(--border)]
+              text-xs sm:text-sm text-[var(--foreground)] opacity-70
               bg-[var(--surface)] shadow-[var(--shadow-soft)]
               animate-fade-in-up stagger-${i + 1}
             `}
@@ -176,7 +176,7 @@ function MessageBubble({ message, index }: { message: Message; index: number }) 
       }`}
       style={{ animationDelay: `${Math.min(index * 0.05, 0.3)}s` }}
     >
-      <div className="relative max-w-[85%]">
+      <div className="relative max-w-[90%] sm:max-w-[85%]">
         {isUser ? (
           <UserBubble>{message.content}</UserBubble>
         ) : (
@@ -191,8 +191,8 @@ function UserBubble({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="
-        px-4 py-3 rounded-2xl rounded-br-md
-        text-white whitespace-pre-wrap
+        px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl rounded-br-md
+        text-sm sm:text-base text-white whitespace-pre-wrap
         shadow-[var(--shadow-soft)]
       "
       style={{
@@ -208,9 +208,9 @@ function AssistantBubble({ children }: { children: React.ReactNode }) {
   return (
     <div
       className="
-        px-4 py-3 rounded-2xl rounded-bl-md
+        px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl rounded-bl-md
         bg-[var(--surface)] border border-[var(--border)]
-        text-[var(--foreground)] whitespace-pre-wrap
+        text-sm sm:text-base text-[var(--foreground)] whitespace-pre-wrap
         shadow-[var(--shadow-soft)]
       "
     >
@@ -401,7 +401,7 @@ function ToolCard({ tool, index }: { tool: UnifiedToolState; index: number }) {
 
   return (
     <div
-      className="rounded-2xl p-4 animate-fade-in-up"
+      className="rounded-xl sm:rounded-2xl p-3 sm:p-4 animate-fade-in-up"
       style={{
         background: config.bgColor,
         border: `1px solid ${config.borderColor}`,
@@ -409,15 +409,15 @@ function ToolCard({ tool, index }: { tool: UnifiedToolState; index: number }) {
       }}
     >
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Icon with gradient background */}
         <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm"
+          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-sm flex-shrink-0"
           style={{ background: config.gradient }}
         >
           {isInProgress ? (
             <div
-              className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+              className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
             />
           ) : (
             config.icon
@@ -425,21 +425,21 @@ function ToolCard({ tool, index }: { tool: UnifiedToolState; index: number }) {
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <span
-              className="font-display font-medium text-sm"
+              className="font-display font-medium text-xs sm:text-sm"
               style={{ color: config.accentColor }}
             >
               {config.label}
             </span>
             {completed && (
-              <span className="text-xs text-[var(--foreground)] opacity-40">
+              <span className="text-[10px] sm:text-xs text-[var(--foreground)] opacity-40">
                 {completed.duration_ms}ms
               </span>
             )}
             {!isInProgress && (
               <svg
-                className="w-4 h-4"
+                className="w-3.5 h-3.5 sm:w-4 sm:h-4"
                 viewBox="0 0 24 24"
                 fill="none"
                 style={{ color: config.accentColor }}
@@ -457,7 +457,7 @@ function ToolCard({ tool, index }: { tool: UnifiedToolState; index: number }) {
 
           {/* Progress bar */}
           {isInProgress && (
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-1.5 sm:mt-2 flex items-center gap-2">
               <div className="flex-1 h-1 rounded-full overflow-hidden bg-[var(--border)]">
                 <div
                   className="h-full rounded-full transition-all duration-300 ease-out animate-progress-pulse"
@@ -467,7 +467,7 @@ function ToolCard({ tool, index }: { tool: UnifiedToolState; index: number }) {
                   }}
                 />
               </div>
-              <span className="text-xs text-[var(--foreground)] opacity-50 tabular-nums w-8 text-right">
+              <span className="text-[10px] sm:text-xs text-[var(--foreground)] opacity-50 tabular-nums w-7 sm:w-8 text-right">
                 {progress}%
               </span>
             </div>
@@ -475,7 +475,7 @@ function ToolCard({ tool, index }: { tool: UnifiedToolState; index: number }) {
 
           {/* Status message */}
           {isInProgress && message && (
-            <p className="text-xs text-[var(--foreground)] opacity-60 mt-1 truncate">
+            <p className="text-[10px] sm:text-xs text-[var(--foreground)] opacity-60 mt-1 truncate">
               {message}
             </p>
           )}
@@ -594,7 +594,7 @@ function HistoricalToolCard({ toolCall, index }: { toolCall: ToolCall; index: nu
 
   return (
     <div
-      className="rounded-2xl p-4"
+      className="rounded-xl sm:rounded-2xl p-3 sm:p-4"
       style={{
         background: config.bgColor,
         border: `1px solid ${config.borderColor}`,
@@ -602,30 +602,30 @@ function HistoricalToolCard({ toolCall, index }: { toolCall: ToolCall; index: nu
       }}
     >
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {/* Icon with gradient background */}
         <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm"
+          className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-sm flex-shrink-0"
           style={{ background: config.gradient }}
         >
           {config.icon}
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <span
-              className="font-display font-medium text-sm"
+              className="font-display font-medium text-xs sm:text-sm"
               style={{ color: config.accentColor }}
             >
               {config.label}
             </span>
             {toolCall.duration_ms && (
-              <span className="text-xs text-[var(--foreground)] opacity-40">
+              <span className="text-[10px] sm:text-xs text-[var(--foreground)] opacity-40">
                 {toolCall.duration_ms}ms
               </span>
             )}
             <svg
-              className="w-4 h-4"
+              className="w-3.5 h-3.5 sm:w-4 sm:h-4"
               viewBox="0 0 24 24"
               fill="none"
               style={{ color: config.accentColor }}
