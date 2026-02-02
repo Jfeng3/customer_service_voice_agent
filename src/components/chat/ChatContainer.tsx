@@ -10,7 +10,7 @@ import { VoiceOrb } from '@/components/voice/VoiceOrb'
 import { StatusBadge } from '@/components/voice/StatusBadge'
 
 export function ChatContainer() {
-  const { messages, isLoading, sessionId, sendMessage, resetLoading, error } = useChat()
+  const { messages, toolCalls, isLoading, sessionId, sendMessage, resetLoading, error } = useChat()
   const { tools, streamingMessage, isComplete, reset } = useRealtimeEvents(sessionId || null)
   const {
     isListening,
@@ -141,7 +141,8 @@ export function ChatContainer() {
         <div className="flex-1 overflow-hidden">
           <MessageList
             messages={messages}
-            tools={tools}
+            historicalToolCalls={toolCalls}
+            activeTools={tools}
             streamingMessage={streamingMessage}
             isLoading={isLoading}
           />

@@ -1,19 +1,21 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import type { Message } from '@/types/chat'
+import type { Message, ToolCall } from '@/types/chat'
 import type { UnifiedToolState } from '@/hooks/useRealtimeEvents'
 
 interface MessageListProps {
   messages: Message[]
-  tools: UnifiedToolState[]
+  historicalToolCalls: Record<string, ToolCall>
+  activeTools: UnifiedToolState[]
   streamingMessage: string
   isLoading: boolean
 }
 
 export function MessageList({
   messages,
-  tools,
+  historicalToolCalls,
+  activeTools,
   streamingMessage,
   isLoading,
 }: MessageListProps) {
@@ -23,9 +25,38 @@ export function MessageList({
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, tools, streamingMessage])
+  }, [messages, activeTools, streamingMessage])
 
   const isEmpty = messages.length === 0 && !streamingMessage
+
+  // Render a message with its associated tool calls (if assistant message)
+  const renderMessageWithTools = (message: Message, index: number) => {
+    const elements = []
+
+    // For assistant messages, render tool calls first
+    if (message.role === 'assistant' && message.tool_calls && message.tool_calls.length > 0) {
+      const toolsForMessage = message.tool_calls
+        .map((tcId) => historicalToolCalls[tcId])
+        .filter(Boolean)
+
+      if (toolsForMessage.length > 0) {
+        elements.push(
+          <div key={`tools-${message.id}`} className="space-y-3">
+            {toolsForMessage.map((tc, tcIndex) => (
+              <HistoricalToolCard key={tc.id} toolCall={tc} index={tcIndex} />
+            ))}
+          </div>
+        )
+      }
+    }
+
+    // Then render the message
+    elements.push(
+      <MessageBubble key={message.id} message={message} index={index} />
+    )
+
+    return elements
+  }
 
   return (
     <div ref={containerRef} className="h-full overflow-y-auto px-6 py-4">
@@ -33,18 +64,12 @@ export function MessageList({
         <WelcomeScreen />
       ) : (
         <div className="space-y-4 max-w-3xl mx-auto">
-          {messages.map((message, index) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              index={index}
-            />
-          ))}
+          {messages.flatMap((message, index) => renderMessageWithTools(message, index))}
 
-          {/* Tools display */}
-          {tools.length > 0 && (
+          {/* Active tools display (for current request) */}
+          {activeTools.length > 0 && (
             <div className="space-y-3 animate-fade-in-up">
-              {tools.map((tool, index) => (
+              {activeTools.map((tool, index) => (
                 <ToolCard key={tool.toolCallId} tool={tool} index={index} />
               ))}
             </div>
@@ -63,7 +88,7 @@ export function MessageList({
           )}
 
           {/* Loading indicator */}
-          {isLoading && !streamingMessage && tools.length === 0 && (
+          {isLoading && !streamingMessage && activeTools.length === 0 && (
             <div className="flex justify-start animate-fade-in-up">
               <div className="relative max-w-[85%]">
                 <AssistantBubble>
@@ -454,6 +479,166 @@ function ToolCard({ tool, index }: { tool: UnifiedToolState; index: number }) {
               {message}
             </p>
           )}
+        </div>
+      </div>
+
+      {/* Results */}
+      {renderResults()}
+    </div>
+  )
+}
+
+// Historical tool call card (for completed tools from DB)
+function HistoricalToolCard({ toolCall, index }: { toolCall: ToolCall; index: number }) {
+  const toolName = toolCall.tool_name
+  const config = toolConfig[toolName] || toolConfig.default
+
+  const renderResults = () => {
+    const query = toolCall.input?.query as string | undefined
+
+    if (toolName === 'knowledge_qa') {
+      const results = toolCall.output?.results as KnowledgeResult[] | undefined
+      return (
+        <div className="mt-3 space-y-2">
+          {query && (
+            <p className="text-sm text-[var(--foreground)] opacity-60">
+              Searched: <span className="font-medium opacity-80">&quot;{query}&quot;</span>
+            </p>
+          )}
+          {results && results.length > 0 && (
+            <div className="space-y-2">
+              {results.slice(0, 3).map((result, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] shadow-sm"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{
+                        background: config.bgColor,
+                        color: config.accentColor,
+                      }}
+                    >
+                      {result.category}
+                    </span>
+                    <span className="text-xs text-[var(--foreground)] opacity-40">
+                      {Math.round(result.similarity * 100)}% match
+                    </span>
+                  </div>
+                  <p className="text-sm text-[var(--foreground)] opacity-80 line-clamp-3">
+                    {result.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // web_search and web_fetch results
+    const results = toolCall.output?.results as WebSearchResult[] | undefined
+    return (
+      <div className="mt-3 space-y-2">
+        {query && (
+          <p className="text-sm text-[var(--foreground)] opacity-60">
+            Searched: <span className="font-medium opacity-80">&quot;{query}&quot;</span>
+          </p>
+        )}
+        {results && results.length > 0 && (
+          <div className="space-y-2">
+            {results.slice(0, 3).map((result, idx) => (
+              <a
+                key={idx}
+                href={result.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="
+                  block p-3 rounded-xl bg-[var(--surface)] border border-[var(--border)]
+                  shadow-sm hover:shadow-md transition-shadow group
+                "
+              >
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className="text-sm font-medium truncate group-hover:underline"
+                      style={{ color: config.accentColor }}
+                    >
+                      {result.title}
+                    </p>
+                    <p className="text-xs text-[var(--foreground)] opacity-50 truncate mt-0.5">
+                      {result.url}
+                    </p>
+                    <p className="text-sm text-[var(--foreground)] opacity-70 line-clamp-2 mt-1">
+                      {result.content}
+                    </p>
+                  </div>
+                  <svg
+                    className="w-4 h-4 text-[var(--foreground)] opacity-30 group-hover:opacity-60 transition-opacity flex-shrink-0 mt-0.5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="rounded-2xl p-4"
+      style={{
+        background: config.bgColor,
+        border: `1px solid ${config.borderColor}`,
+        animationDelay: `${index * 0.1}s`,
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        {/* Icon with gradient background */}
+        <div
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm"
+          style={{ background: config.gradient }}
+        >
+          {config.icon}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className="font-display font-medium text-sm"
+              style={{ color: config.accentColor }}
+            >
+              {config.label}
+            </span>
+            {toolCall.duration_ms && (
+              <span className="text-xs text-[var(--foreground)] opacity-40">
+                {toolCall.duration_ms}ms
+              </span>
+            )}
+            <svg
+              className="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              style={{ color: config.accentColor }}
+            >
+              <path
+                d="M9 12l2 2 4-4"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
         </div>
       </div>
 

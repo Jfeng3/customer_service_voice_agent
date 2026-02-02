@@ -3,10 +3,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import { nanoid } from 'nanoid'
 import { supabase } from '@/lib/supabase/client'
-import type { Message } from '@/types/chat'
+import type { Message, ToolCall } from '@/types/chat'
 
 interface UseChatReturn {
   messages: Message[]
+  toolCalls: Record<string, ToolCall> // keyed by tool call ID
   isLoading: boolean
   sessionId: string
   sendMessage: (content: string) => Promise<void>
@@ -17,6 +18,7 @@ interface UseChatReturn {
 
 export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>([])
+  const [toolCalls, setToolCalls] = useState<Record<string, ToolCall>>({})
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
@@ -26,28 +28,48 @@ export function useChat(): UseChatReturn {
     setSessionId(nanoid())
   }, [])
 
-  // Load existing messages for this session
+  // Load existing messages and tool calls for this session
   useEffect(() => {
     if (!sessionId) return
 
-    async function loadMessages() {
-      const { data, error: fetchError } = await supabase
+    async function loadData() {
+      // Load messages
+      const { data: messagesData, error: messagesError } = await supabase
         .from('csva_messages')
         .select('*')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: true })
 
-      if (fetchError) {
-        console.error('Failed to load messages:', fetchError)
+      if (messagesError) {
+        console.error('Failed to load messages:', messagesError)
         return
       }
 
-      if (data) {
-        setMessages(data)
+      if (messagesData) {
+        setMessages(messagesData)
+      }
+
+      // Load tool calls
+      const { data: toolCallsData, error: toolCallsError } = await supabase
+        .from('csva_tool_calls')
+        .select('*')
+        .eq('session_id', sessionId)
+
+      if (toolCallsError) {
+        console.error('Failed to load tool calls:', toolCallsError)
+        return
+      }
+
+      if (toolCallsData) {
+        const toolCallsMap: Record<string, ToolCall> = {}
+        toolCallsData.forEach((tc) => {
+          toolCallsMap[tc.id] = tc
+        })
+        setToolCalls(toolCallsMap)
       }
     }
 
-    loadMessages()
+    loadData()
   }, [sessionId])
 
   // Subscribe to new messages for this session
@@ -156,6 +178,7 @@ export function useChat(): UseChatReturn {
 
   return {
     messages,
+    toolCalls,
     isLoading,
     sessionId,
     sendMessage,
