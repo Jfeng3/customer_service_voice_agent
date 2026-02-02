@@ -11,6 +11,7 @@ interface UseChatReturn {
   sessionId: string
   sendMessage: (content: string) => Promise<void>
   clearMessages: () => void
+  resetLoading: () => void
   error: string | null
 }
 
@@ -135,12 +136,17 @@ export function useChat(): UseChatReturn {
     setMessages([])
   }, [])
 
+  const resetLoading = useCallback(() => {
+    setIsLoading(false)
+  }, [])
+
   return {
     messages,
     isLoading,
     sessionId,
     sendMessage,
     clearMessages,
+    resetLoading,
     error,
   }
 }

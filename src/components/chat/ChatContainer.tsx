@@ -10,7 +10,7 @@ import { VoiceOrb } from '@/components/voice/VoiceOrb'
 import { StatusBadge } from '@/components/voice/StatusBadge'
 
 export function ChatContainer() {
-  const { messages, isLoading, sessionId, sendMessage, error } = useChat()
+  const { messages, isLoading, sessionId, sendMessage, resetLoading, error } = useChat()
   const { tools, streamingMessage, isComplete, reset } = useRealtimeEvents(sessionId || null)
   const {
     isListening,
@@ -46,6 +46,19 @@ export function ChatContainer() {
       }
     }
   }, [isComplete, streamingMessage, messages, reset])
+
+  // Safety: ensure isLoading resets when response is complete
+  // This handles edge cases where postgres_changes might not fire
+  useEffect(() => {
+    if (isComplete && isLoading) {
+      // Give a small delay for postgres_changes to fire first
+      const timeout = setTimeout(() => {
+        console.log('Safety reset: forcing isLoading to false')
+        resetLoading()
+      }, 1500)
+      return () => clearTimeout(timeout)
+    }
+  }, [isComplete, isLoading, resetLoading])
 
   // Send voice transcript as message
   const handleVoiceStop = () => {
