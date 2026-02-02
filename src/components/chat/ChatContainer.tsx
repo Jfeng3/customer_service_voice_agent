@@ -99,10 +99,10 @@ export function ChatContainer() {
             </div>
             <div>
               <h1 className="font-display text-xl font-semibold tracking-tight text-[var(--foreground)]">
-                Customer Service
+                Rainie Beauty
               </h1>
               <p className="text-sm text-[var(--foreground)] opacity-50 font-display">
-                {sessionId ? `Session ${sessionId.slice(0, 8)}` : 'Connecting...'}
+                {sessionId ? 'Front Desk Assistant' : 'Connecting...'}
               </p>
             </div>
           </div>

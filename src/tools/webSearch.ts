@@ -149,7 +149,7 @@ function getMockResults(query: string): SearchResult[] {
     {
       title: `Search Results for: ${query}`,
       url: 'https://example.com/search',
-      content: `Here are the top results for your search "${query}". Our customer service team is available 24/7 to assist you.`,
+      content: `Here are the top results for your search "${query}". Feel free to ask if you need more information about Rainie Beauty.`,
       score: 0.80,
     },
     {

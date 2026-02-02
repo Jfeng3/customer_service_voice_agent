@@ -1,7 +1,7 @@
-# Customer Service Voice Agent
+# Rainie Beauty Front Desk Agent
 
 ## Overview
-A voice-enabled customer service agent built with Next.js, featuring real-time tool progress visibility and text-to-speech responses.
+A voice-enabled front desk assistant for Rainie Beauty salon (rainiebeauty.com), built with Next.js, featuring real-time tool progress visibility and text-to-speech responses.
 
 ## Tech Stack
 - **Framework**: Next.js 16 (App Router)

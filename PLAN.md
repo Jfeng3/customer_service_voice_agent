@@ -1,7 +1,7 @@
-# Voice Customer Service Agent - Implementation Plan
+# Rainie Beauty Front Desk Agent - Implementation Plan
 
 ## Overview
-Build a voice-enabled customer service agent using:
+Build a voice-enabled front desk assistant for Rainie Beauty salon (rainiebeauty.com) using:
 - **Next.js** (App Router) - Full-stack framework
 - **OpenRouter** - LLM API (default: claude-opus-4-5-20250514)
 - **ElevenLabs** - Text-to-speech

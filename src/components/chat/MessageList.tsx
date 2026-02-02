@@ -115,15 +115,15 @@ function WelcomeScreen() {
       </div>
 
       <h2 className="font-display text-2xl font-semibold text-[var(--foreground)] mb-3">
-        How can I help you today?
+        Welcome to Rainie Beauty
       </h2>
       <p className="text-[var(--foreground)] opacity-60 max-w-md mb-8">
-        I&apos;m your AI assistant. Ask me anything or use voice input to speak naturally.
+        I&apos;m your front desk assistant. Book appointments, ask about our services, or get directions to our salon.
       </p>
 
       {/* Quick action chips */}
       <div className="flex flex-wrap justify-center gap-2">
-        {['Ask a question', 'Get support', 'Learn more'].map((action, i) => (
+        {['Book appointment', 'Our services', 'Find us'].map((action, i) => (
           <div
             key={action}
             className={`
