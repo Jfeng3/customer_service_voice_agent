@@ -66,6 +66,22 @@ export function useChat(): UseChatReturn {
         },
         (payload) => {
           const newMessage = payload.new as Message
+
+          // Only add assistant messages from DB
+          // User messages are already added optimistically
+          if (newMessage.role === 'user') {
+            // Replace temp message with real DB message (for correct ID)
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id.startsWith('temp_') && m.content === newMessage.content && m.role === 'user'
+                  ? newMessage
+                  : m
+              )
+            )
+            return
+          }
+
+          // Add assistant message
           setMessages((prev) => {
             // Avoid duplicates
             if (prev.some((m) => m.id === newMessage.id)) {
@@ -75,9 +91,7 @@ export function useChat(): UseChatReturn {
           })
 
           // Stop loading when we get an assistant message
-          if (newMessage.role === 'assistant') {
-            setIsLoading(false)
-          }
+          setIsLoading(false)
         }
       )
       .subscribe()
