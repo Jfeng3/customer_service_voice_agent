@@ -20,6 +20,14 @@ export function StatusBadge({ state, onStopSpeaking }: StatusBadgeProps) {
           borderColor: 'border-red-500/20',
           textColor: 'text-red-600 dark:text-red-400',
         }
+      case 'transcribing':
+        return {
+          label: 'Transcribing',
+          color: 'bg-amber-500',
+          bgColor: 'bg-amber-500/10',
+          borderColor: 'border-amber-500/20',
+          textColor: 'text-amber-600 dark:text-amber-400',
+        }
       case 'speaking':
         return {
           label: 'Speaking',
@@ -67,6 +75,9 @@ export function StatusBadge({ state, onStopSpeaking }: StatusBadgeProps) {
               />
             ))}
           </>
+        ) : state === 'transcribing' ? (
+          // Spinner for transcribing
+          <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
         ) : (
           // Pulse dots for thinking
           <>

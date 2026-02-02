@@ -42,6 +42,7 @@ Required in `.env.local`:
 - `WANDB_API_KEY` - Weights & Biases API key (for agent observability)
 - `WANDB_PROJECT` - W&B project name (default: customer-service-voice-agent)
 - `FIRECRAWL_API_KEY` - Firecrawl API key (for website crawling)
+- `DEEPGRAM_API_KEY` - Deepgram API key (for speech-to-text)
 
 ## Database Tables
 - `csva_messages` - Chat message history

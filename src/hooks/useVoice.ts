@@ -5,9 +5,10 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 interface UseVoiceReturn {
   // Speech-to-text
   isListening: boolean
+  isTranscribing: boolean
   transcript: string
   startListening: () => void
-  stopListening: () => void
+  stopListening: () => Promise<string>
   clearTranscript: () => void
 
   // Text-to-speech
@@ -22,108 +23,129 @@ interface UseVoiceReturn {
 
 export function useVoice(): UseVoiceReturn {
   const [isListening, setIsListening] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcript, setTranscript] = useState('')
-  const [interimTranscript, setInterimTranscript] = useState('')
   const [isSpeaking, setIsSpeaking] = useState(false)
-  const finalTranscriptRef = useRef('')
   const [error, setError] = useState<string | null>(null)
   const [isSupported, setIsSupported] = useState(true)
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const streamRef = useRef<MediaStream | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // Check browser support
+  // Check browser support for MediaRecorder
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition
-
-    if (!SpeechRecognition) {
+    if (!navigator.mediaDevices || !window.MediaRecorder) {
       setIsSupported(false)
-      setError('Speech recognition not supported in this browser')
+      setError('Audio recording not supported in this browser')
     }
   }, [])
 
-  // Initialize speech recognition
-  const initRecognition = useCallback(() => {
-    if (typeof window === 'undefined') return null
+  const startListening = useCallback(async () => {
+    setError(null)
+    setTranscript('')
+    audioChunksRef.current = []
 
-    const SpeechRecognition =
-      window.SpeechRecognition || window.webkitSpeechRecognition
+    try {
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 16000,
+        },
+      })
+      streamRef.current = stream
 
-    if (!SpeechRecognition) return null
+      // Create MediaRecorder with webm/opus format (best compatibility)
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : 'audio/webm',
+      })
 
-    const recognition = new SpeechRecognition()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = 'en-US'
-
-    recognition.onresult = (event) => {
-      let interim = ''
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i]
-        if (result.isFinal) {
-          // Accumulate final results
-          finalTranscriptRef.current += result[0].transcript + ' '
-        } else {
-          // Interim results replace each other (don't accumulate)
-          interim += result[0].transcript
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
         }
       }
 
-      // Show final + current interim (interim will be replaced on next event)
-      setTranscript(finalTranscriptRef.current + interim)
-      setInterimTranscript(interim)
-    }
-
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error)
-      setError(`Speech recognition error: ${event.error}`)
+      mediaRecorderRef.current = mediaRecorder
+      mediaRecorder.start(100) // Collect data every 100ms
+      setIsListening(true)
+    } catch (err) {
+      console.error('Failed to start recording:', err)
+      setError('Failed to access microphone. Please allow microphone access.')
       setIsListening(false)
     }
-
-    recognition.onend = () => {
-      setIsListening(false)
-    }
-
-    return recognition
   }, [])
 
-  const startListening = useCallback(() => {
-    setError(null)
-    setTranscript('')
-    setInterimTranscript('')
-    finalTranscriptRef.current = ''
-
-    if (!recognitionRef.current) {
-      recognitionRef.current = initRecognition()
-    }
-
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.start()
-        setIsListening(true)
-      } catch (err) {
-        console.error('Failed to start recognition:', err)
-        setError('Failed to start voice recognition')
+  const stopListening = useCallback(async (): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+        setIsListening(false)
+        resolve('')
+        return
       }
-    }
-  }, [initRecognition])
 
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      setIsListening(false)
-    }
+      mediaRecorderRef.current.onstop = async () => {
+        setIsListening(false)
+        setIsTranscribing(true)
+
+        // Stop all tracks
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop())
+          streamRef.current = null
+        }
+
+        // Create audio blob
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        audioChunksRef.current = []
+
+        // Skip if too short (less than 0.5 seconds of audio)
+        if (audioBlob.size < 5000) {
+          setIsTranscribing(false)
+          resolve('')
+          return
+        }
+
+        try {
+          // Send to Deepgram API
+          const formData = new FormData()
+          formData.append('audio', audioBlob, 'recording.webm')
+
+          const response = await fetch('/api/voice/input', {
+            method: 'POST',
+            body: formData,
+          })
+
+          if (!response.ok) {
+            throw new Error('Transcription failed')
+          }
+
+          const data = await response.json()
+          const transcriptText = data.transcript || ''
+
+          setTranscript(transcriptText)
+          setIsTranscribing(false)
+          resolve(transcriptText)
+        } catch (err) {
+          console.error('Transcription error:', err)
+          setError('Failed to transcribe audio')
+          setIsTranscribing(false)
+          resolve('')
+        }
+      }
+
+      mediaRecorderRef.current.stop()
+    })
   }, [])
 
   const clearTranscript = useCallback(() => {
     setTranscript('')
-    setInterimTranscript('')
-    finalTranscriptRef.current = ''
   }, [])
 
   // Text-to-speech using ElevenLabs API
@@ -183,8 +205,11 @@ export function useVoice(): UseVoiceReturn {
   // Cleanup
   useEffect(() => {
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop()
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop()
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
       }
       if (audioRef.current) {
         audioRef.current.pause()
@@ -194,6 +219,7 @@ export function useVoice(): UseVoiceReturn {
 
   return {
     isListening,
+    isTranscribing,
     transcript,
     startListening,
     stopListening,
@@ -205,4 +231,3 @@ export function useVoice(): UseVoiceReturn {
     isSupported,
   }
 }
-

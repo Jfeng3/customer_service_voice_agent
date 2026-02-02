@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 
-export type OrbState = 'idle' | 'listening' | 'speaking' | 'thinking'
+export type OrbState = 'idle' | 'listening' | 'transcribing' | 'speaking' | 'thinking'
 
 interface VoiceOrbProps {
   state: OrbState
@@ -56,6 +56,12 @@ export function VoiceOrb({
           background: 'var(--gradient-orb-listening)',
           boxShadow: 'var(--shadow-glow-listening)',
           scale: 1.1,
+        }
+      case 'transcribing':
+        return {
+          background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%)',
+          boxShadow: '0 0 40px rgba(245, 158, 11, 0.4), 0 0 80px rgba(245, 158, 11, 0.2)',
+          scale: 1,
         }
       case 'speaking':
         return {
@@ -142,6 +148,8 @@ export function VoiceOrb({
         {/* Icon */}
         {state === 'thinking' ? (
           <ThinkingIcon />
+        ) : state === 'transcribing' ? (
+          <TranscribingIcon />
         ) : state === 'speaking' ? (
           <SpeakingIcon />
         ) : (
@@ -149,18 +157,20 @@ export function VoiceOrb({
         )}
 
         {/* Rotating ring for active states */}
-        {(state === 'listening' || state === 'speaking' || state === 'thinking') && (
+        {(state === 'listening' || state === 'transcribing' || state === 'speaking' || state === 'thinking') && (
           <div
             className="absolute inset-[-2px] rounded-full animate-orb-rotate"
             style={{
               background: `conic-gradient(from 0deg, transparent 0%, ${
                 state === 'listening'
                   ? 'rgba(220,38,38,0.6)'
+                  : state === 'transcribing'
+                  ? 'rgba(245,158,11,0.6)'
                   : state === 'speaking'
                   ? 'rgba(74,107,255,0.6)'
                   : 'rgba(139,92,246,0.6)'
               } 25%, transparent 50%)`,
-              animationDuration: state === 'thinking' ? '2s' : '3s',
+              animationDuration: state === 'thinking' || state === 'transcribing' ? '2s' : '3s',
             }}
           />
         )}
@@ -218,5 +228,11 @@ function ThinkingIcon() {
         />
       ))}
     </div>
+  )
+}
+
+function TranscribingIcon() {
+  return (
+    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
   )
 }

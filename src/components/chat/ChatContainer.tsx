@@ -14,6 +14,7 @@ export function ChatContainer() {
   const { tools, streamingMessage, isComplete, reset } = useRealtimeEvents(sessionId || null)
   const {
     isListening,
+    isTranscribing,
     transcript,
     startListening,
     stopListening,
@@ -56,10 +57,10 @@ export function ChatContainer() {
   }, [isComplete, resetLoading])
 
   // Send voice transcript as message
-  const handleVoiceStop = () => {
-    stopListening()
-    if (transcript.trim()) {
-      sendMessage(transcript.trim())
+  const handleVoiceStop = async () => {
+    const transcribedText = await stopListening()
+    if (transcribedText.trim()) {
+      sendMessage(transcribedText.trim())
       clearTranscript()
     }
   }
@@ -67,6 +68,7 @@ export function ChatContainer() {
   // Determine current state for orb
   const getOrbState = () => {
     if (isListening) return 'listening'
+    if (isTranscribing) return 'transcribing'
     if (isSpeaking) return 'speaking'
     if (isLoading) return 'thinking'
     return 'idle'
@@ -154,7 +156,7 @@ export function ChatContainer() {
               <div className="flex-1">
                 <InputArea
                   onSend={sendMessage}
-                  disabled={isLoading || isListening}
+                  disabled={isLoading || isListening || isTranscribing}
                 />
               </div>
 
@@ -166,7 +168,7 @@ export function ChatContainer() {
                   onStart={startListening}
                   onStop={handleVoiceStop}
                   transcript={transcript}
-                  disabled={isLoading || isSpeaking}
+                  disabled={isLoading || isSpeaking || isTranscribing}
                 />
               )}
             </div>
