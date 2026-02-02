@@ -23,7 +23,9 @@ interface UseVoiceReturn {
 export function useVoice(): UseVoiceReturn {
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
+  const [interimTranscript, setInterimTranscript] = useState('')
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const finalTranscriptRef = useRef('')
   const [error, setError] = useState<string | null>(null)
   const [isSupported, setIsSupported] = useState(true)
 
@@ -59,19 +61,22 @@ export function useVoice(): UseVoiceReturn {
     recognition.lang = 'en-US'
 
     recognition.onresult = (event) => {
-      let finalTranscript = ''
-      let interimTranscript = ''
+      let interim = ''
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i]
         if (result.isFinal) {
-          finalTranscript += result[0].transcript
+          // Accumulate final results
+          finalTranscriptRef.current += result[0].transcript + ' '
         } else {
-          interimTranscript += result[0].transcript
+          // Interim results replace each other (don't accumulate)
+          interim += result[0].transcript
         }
       }
 
-      setTranscript((prev) => prev + finalTranscript + interimTranscript)
+      // Show final + current interim (interim will be replaced on next event)
+      setTranscript(finalTranscriptRef.current + interim)
+      setInterimTranscript(interim)
     }
 
     recognition.onerror = (event) => {
@@ -90,6 +95,8 @@ export function useVoice(): UseVoiceReturn {
   const startListening = useCallback(() => {
     setError(null)
     setTranscript('')
+    setInterimTranscript('')
+    finalTranscriptRef.current = ''
 
     if (!recognitionRef.current) {
       recognitionRef.current = initRecognition()
@@ -115,6 +122,8 @@ export function useVoice(): UseVoiceReturn {
 
   const clearTranscript = useCallback(() => {
     setTranscript('')
+    setInterimTranscript('')
+    finalTranscriptRef.current = ''
   }, [])
 
   // Text-to-speech using ElevenLabs API
