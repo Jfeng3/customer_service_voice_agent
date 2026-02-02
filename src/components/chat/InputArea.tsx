@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, FormEvent, KeyboardEvent } from 'react'
+import { useState, FormEvent, KeyboardEvent, useRef, useEffect } from 'react'
 
 interface InputAreaProps {
   onSend: (message: string) => void
@@ -14,6 +14,16 @@ export function InputArea({
   placeholder = 'Type your message...',
 }: InputAreaProps) {
   const [input, setInput] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`
+    }
+  }, [input])
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -31,10 +41,13 @@ export function InputArea({
     }
   }
 
+  const hasInput = input.trim().length > 0
+
   return (
-    <form onSubmit={handleSubmit} className="p-4 border-t dark:border-gray-700">
-      <div className="flex gap-2">
+    <form onSubmit={handleSubmit} className="flex items-end gap-3">
+      <div className="flex-1 relative">
         <textarea
+          ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -42,43 +55,66 @@ export function InputArea({
           disabled={disabled}
           rows={1}
           className={`
-            flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600
-            bg-white dark:bg-gray-800 px-4 py-2
-            text-gray-900 dark:text-gray-100
-            placeholder-gray-500 dark:placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+            w-full resize-none rounded-2xl
+            bg-transparent
+            px-4 py-3
+            text-[var(--foreground)]
+            placeholder:text-[var(--foreground)] placeholder:opacity-40
+            focus:outline-none
             disabled:opacity-50 disabled:cursor-not-allowed
+            transition-all duration-200
           `}
+          style={{
+            minHeight: '48px',
+            maxHeight: '120px',
+          }}
         />
-        <button
-          type="submit"
-          disabled={disabled || !input.trim()}
-          className={`
-            px-4 py-2 rounded-lg font-medium transition-colors
-            ${disabled || !input.trim()
-              ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-not-allowed'
-              : 'bg-blue-500 hover:bg-blue-600 text-white'
-            }
-          `}
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-            />
-          </svg>
-        </button>
       </div>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        Press Enter to send, Shift+Enter for new line
-      </p>
+
+      {/* Send button */}
+      <button
+        type="submit"
+        disabled={disabled || !hasInput}
+        className={`
+          relative flex-shrink-0
+          w-12 h-12 rounded-2xl
+          flex items-center justify-center
+          transition-all duration-300 ease-out
+          focus-ring
+          ${disabled || !hasInput
+            ? 'bg-[var(--border)] cursor-not-allowed'
+            : 'bg-gradient-to-br from-[var(--accent-primary)] to-[#ff4757] hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl'
+          }
+        `}
+        aria-label="Send message"
+      >
+        {/* Send icon */}
+        <svg
+          className={`w-5 h-5 transition-all duration-200 ${
+            hasInput && !disabled ? 'text-white' : 'text-[var(--foreground)] opacity-30'
+          }`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+          />
+        </svg>
+
+        {/* Highlight effect */}
+        {hasInput && !disabled && (
+          <div
+            className="absolute inset-[2px] rounded-xl opacity-30"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 50%)',
+            }}
+          />
+        )}
+      </button>
     </form>
   )
 }
