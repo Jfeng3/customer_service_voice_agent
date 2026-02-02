@@ -47,18 +47,13 @@ export function ChatContainer() {
     }
   }, [isComplete, streamingMessage, messages, reset])
 
-  // Safety: ensure isLoading resets when response is complete
-  // This handles edge cases where postgres_changes might not fire
+  // Reset isLoading when response is complete
+  // This is the primary mechanism since postgres_changes on csva_messages may not be enabled
   useEffect(() => {
-    if (isComplete && isLoading) {
-      // Give a small delay for postgres_changes to fire first
-      const timeout = setTimeout(() => {
-        console.log('Safety reset: forcing isLoading to false')
-        resetLoading()
-      }, 1500)
-      return () => clearTimeout(timeout)
+    if (isComplete) {
+      resetLoading()
     }
-  }, [isComplete, isLoading, resetLoading])
+  }, [isComplete, resetLoading])
 
   // Send voice transcript as message
   const handleVoiceStop = () => {
