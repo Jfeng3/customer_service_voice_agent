@@ -294,6 +294,18 @@ body::before {
   }
 }
 
+/* Safe area for mobile devices with notches */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Fallback for browsers without dvh support */
+@supports not (height: 1dvh) {
+  .h-dvh {
+    height: 100vh;
+  }
+}
+
 /* Typography */
 .font-display {
   font-family: var(--font-display);

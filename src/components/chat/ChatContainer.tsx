@@ -75,7 +75,7 @@ export function ChatContainer() {
   }
 
   return (
-    <div className="relative flex h-screen overflow-hidden">
+    <div className="relative flex h-dvh overflow-hidden">
       {/* Ambient background elements */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {/* Large gradient orbs in background */}
@@ -149,7 +149,7 @@ export function ChatContainer() {
         </div>
 
         {/* Input area with voice orb */}
-        <div className={`relative px-3 sm:px-6 pb-4 sm:pb-6 pt-3 sm:pt-4 ${mounted ? 'animate-fade-in-up' : 'opacity-0'}`} style={{ animationDelay: '0.2s' }}>
+        <div className={`relative px-3 sm:px-6 pb-4 sm:pb-6 pt-3 sm:pt-4 pb-safe ${mounted ? 'animate-fade-in-up' : 'opacity-0'}`} style={{ animationDelay: '0.2s' }}>
           {/* Glass container for input */}
           <div className="relative glass rounded-2xl sm:rounded-3xl border border-[var(--border)] shadow-[var(--shadow-elevated)]">
             <div className="flex items-end gap-2 sm:gap-4 p-2 sm:p-4">
