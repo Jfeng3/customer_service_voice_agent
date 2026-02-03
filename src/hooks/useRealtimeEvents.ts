@@ -8,6 +8,7 @@ import type { ToolCallRecord } from '@/types/events'
 export interface UnifiedToolState {
   toolCallId: string
   toolName: string
+  messageId: string // The assistant message this tool belongs to
   status: 'started' | 'progress' | 'completed'
   progress: number
   message?: string
@@ -45,6 +46,7 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
           {
             toolCallId: payload.toolCallId,
             toolName: payload.toolName,
+            messageId: payload.messageId, // Track which message this tool belongs to
             status: 'started',
             progress: 0,
           }

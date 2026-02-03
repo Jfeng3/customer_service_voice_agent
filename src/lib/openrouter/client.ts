@@ -1,4 +1,3 @@
-import { nanoid } from 'nanoid'
 import { supabaseAdmin } from '@/lib/supabase/server'
 import { ensureWeaveInitialized, weave } from '@/lib/weave/client'
 
@@ -88,6 +87,7 @@ interface CallOpenRouterOptions {
   messages: { role: 'user' | 'assistant'; content: string }[]
   tools: ToolDefinition[]
   sessionId: string
+  messageId: string // Pre-generated ID for the assistant message (links tools to message)
   memoryContext?: string
   onToolStart?: (toolName: string, toolCallId: string) => Promise<void>
   onToolProgress?: (
@@ -132,6 +132,7 @@ export async function callOpenRouter(
     messages,
     tools,
     sessionId,
+    messageId,
     memoryContext,
     onToolStart,
     onToolProgress,
@@ -282,6 +283,7 @@ Be warm, helpful, and professional. If you don't know something, offer to connec
         const toolCallData = {
           tool_call_id: toolCallId,
           session_id: sessionId,
+          message_id: messageId, // Link to the assistant message
           tool_name: toolName,
           input: args,
           output: result as Record<string, unknown>,

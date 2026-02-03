@@ -6,6 +6,10 @@ import { executeTool, toolDefinitions } from '@/tools'
 import { getMemoryContext, extractAndStoreMemories } from '@/lib/memory/client'
 import type { Message } from '@/types/chat'
 
+function generateUUID(): string {
+  return crypto.randomUUID()
+}
+
 interface WebhookPayload {
   sessionId: string
   message: string
@@ -48,7 +52,8 @@ async function handler(request: NextRequest) {
       // Continue without memories if retrieval fails
     }
 
-    // 3. Call OpenRouter with tool support
+    // 3. Generate message ID upfront (so tools can reference it)
+    const messageId = generateUUID()
     let assistantResponse = ''
     const usedToolCallIds: string[] = []
 
@@ -57,11 +62,13 @@ async function handler(request: NextRequest) {
         messages: openRouterMessages,
         tools: toolDefinitions,
         sessionId,
+        messageId,
         memoryContext,
         onToolStart: async (toolName, toolCallId) => {
           await broadcastEvent(sessionId, 'tool:started', {
             toolName,
             toolCallId,
+            messageId, // Include message ID so frontend knows which message this tool belongs to
           })
         },
         onToolProgress: async (toolName, toolCallId, progress, message) => {
@@ -96,20 +103,21 @@ async function handler(request: NextRequest) {
       })
     }
 
-    // 3. Broadcast response done
+    // 4. Broadcast response done with the message ID
     await broadcastEvent(sessionId, 'response:done', {
-      messageId: `msg_${Date.now()}`,
+      messageId,
     })
 
-    // 4. Save assistant response to database
+    // 5. Save assistant response to database with the pre-generated ID
     await supabaseAdmin.from('csva_messages').insert({
+      id: messageId, // Use the pre-generated ID
       session_id: sessionId,
       role: 'assistant',
       content: assistantResponse,
       tool_calls: usedToolCallIds.length > 0 ? usedToolCallIds : null,
     })
 
-    // 5. Extract and store memories from this conversation turn
+    // 6. Extract and store memories from this conversation turn
     try {
       await extractAndStoreMemories({
         sessionId,

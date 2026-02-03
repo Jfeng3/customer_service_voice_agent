@@ -12,6 +12,7 @@ export interface Message {
 export interface ToolCall {
   id: string
   session_id: string
+  message_id?: string // References the assistant message this tool belongs to (optional for legacy data)
   tool_name: string
   input: Record<string, unknown>
   output?: Record<string, unknown>

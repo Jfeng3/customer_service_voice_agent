@@ -11,6 +11,7 @@ export interface ToolStartedEvent {
   type: 'tool:started'
   toolName: string
   toolCallId: string
+  messageId: string // The assistant message this tool belongs to
 }
 
 export interface ToolProgressEvent {
@@ -59,6 +60,7 @@ export interface ToolCallRecord {
   id: string
   tool_call_id: string
   session_id: string
+  message_id?: string // References the assistant message this tool belongs to (optional for legacy data)
   tool_name: string
   input: Record<string, unknown>
   output: Record<string, unknown>
