@@ -29,9 +29,16 @@ export function MessageList({
 
   const isEmpty = messages.length === 0 && !streamingMessage
 
+  // Check if the last message is a pending user message (no following assistant response yet)
+  const lastMessage = messages[messages.length - 1]
+  const hasPendingUserMessage = lastMessage?.role === 'user'
+
   // Render a message with its associated tool calls (if assistant message)
+  // Also renders active tools after the pending user message
   const renderMessageWithTools = (message: Message, index: number) => {
     const elements = []
+    const isLastMessage = index === messages.length - 1
+    const isPendingUserMessage = isLastMessage && message.role === 'user'
 
     // For assistant messages, render tool calls first
     if (message.role === 'assistant' && message.tool_calls && message.tool_calls.length > 0) {
@@ -50,10 +57,21 @@ export function MessageList({
       }
     }
 
-    // Then render the message
+    // Render the message
     elements.push(
       <MessageBubble key={message.id} message={message} index={index} />
     )
+
+    // If this is the pending user message, render active tools after it
+    if (isPendingUserMessage && activeTools.length > 0) {
+      elements.push(
+        <div key="active-tools" className="space-y-3 animate-fade-in-up">
+          {activeTools.map((tool, idx) => (
+            <ToolCard key={tool.toolCallId} tool={tool} index={idx} />
+          ))}
+        </div>
+      )
+    }
 
     return elements
   }
@@ -66,11 +84,11 @@ export function MessageList({
         <div className="space-y-3 sm:space-y-4 max-w-3xl mx-auto">
           {messages.flatMap((message, index) => renderMessageWithTools(message, index))}
 
-          {/* Active tools display (for current request) */}
-          {activeTools.length > 0 && (
+          {/* Fallback: render active tools at bottom if no pending user message */}
+          {!hasPendingUserMessage && activeTools.length > 0 && (
             <div className="space-y-3 animate-fade-in-up">
-              {activeTools.map((tool, index) => (
-                <ToolCard key={tool.toolCallId} tool={tool} index={index} />
+              {activeTools.map((tool, idx) => (
+                <ToolCard key={tool.toolCallId} tool={tool} index={idx} />
               ))}
             </div>
           )}
