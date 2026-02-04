@@ -11,7 +11,6 @@ import { StatusBadge } from '@/components/voice/StatusBadge'
 
 export function ChatContainer() {
   const { messages, toolCalls, isLoading, sessionId, sendMessage, resetLoading, error } = useChat()
-  const { tools, streamingMessage, isComplete, reset } = useRealtimeEvents(sessionId || null)
   const {
     isListening,
     isTranscribing,
@@ -24,6 +23,10 @@ export function ChatContainer() {
     stopSpeaking,
     isSupported: voiceSupported,
   } = useVoice()
+  const { tools, streamingMessage, isComplete, reset } = useRealtimeEvents(
+    sessionId || null,
+    { onProcessingStarted: stopSpeaking }
+  )
 
   const [mounted, setMounted] = useState(false)
 

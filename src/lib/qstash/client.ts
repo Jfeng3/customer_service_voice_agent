@@ -15,7 +15,7 @@ export async function publishChatMessage(sessionId: string, message: string) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const webhookUrl = `${appUrl}/api/qstash/webhook`
 
-  const result = await qstash.publishJSON({
+  const result = await qstash.queue({ queueName: 'call_center' }).enqueueJSON({
     url: webhookUrl,
     body: {
       sessionId,

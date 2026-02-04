@@ -21,6 +21,9 @@ async function handler(request: NextRequest) {
     const payload: WebhookPayload = await request.json()
     const { sessionId, message } = payload
 
+    // 0. Notify frontend that processing started (cuts TTS from previous message)
+    await broadcastEvent(sessionId, 'processing:started', { timestamp: Date.now() })
+
     // 1. Load conversation history from Supabase
     const { data: historyData } = await supabaseAdmin
       .from('csva_messages')

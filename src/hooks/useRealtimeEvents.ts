@@ -16,6 +16,10 @@ export interface UnifiedToolState {
   completed?: ToolCallRecord
 }
 
+interface UseRealtimeEventsOptions {
+  onProcessingStarted?: () => void
+}
+
 interface UseRealtimeEventsReturn {
   tools: UnifiedToolState[]
   streamingMessage: string
@@ -23,7 +27,10 @@ interface UseRealtimeEventsReturn {
   reset: () => void
 }
 
-export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsReturn {
+export function useRealtimeEvents(
+  sessionId: string | null,
+  options?: UseRealtimeEventsOptions
+): UseRealtimeEventsReturn {
   const [tools, setTools] = useState<UnifiedToolState[]>([])
   const [streamingMessage, setStreamingMessage] = useState('')
   const [isComplete, setIsComplete] = useState(false)
@@ -38,6 +45,11 @@ export function useRealtimeEvents(sessionId: string | null): UseRealtimeEventsRe
     if (!sessionId) return
 
     const channel = supabase.channel(`session:${sessionId}`)
+      // Processing started - cut TTS from previous message
+      .on('broadcast', { event: 'processing:started' }, () => {
+        console.log('🚀 processing:started received - cutting TTS')
+        options?.onProcessingStarted?.()
+      })
       // Tool started - add new tool to list
       .on('broadcast', { event: 'tool:started' }, ({ payload }) => {
         console.log('🔧 tool:started received:', payload)
