@@ -88,24 +88,24 @@ export function useChat(): UseChatReturn {
         },
         (payload) => {
           const newMessage = payload.new as Message
+          console.log('📨 postgres_changes received:', newMessage.role, newMessage.id)
 
           // Ignore user messages from DB - we already have the optimistic one
-          // The temp message is functionally equivalent and displays correctly
           if (newMessage.role === 'user') {
+            console.log('📨 Ignoring user message from DB')
             return
           }
 
-          // Add assistant message
+          // Add assistant message (only if not duplicate)
+          // Note: isLoading is reset via isComplete in ChatContainer, not here
           setMessages((prev) => {
-            // Avoid duplicates
             if (prev.some((m) => m.id === newMessage.id)) {
+              console.log('📨 Duplicate message, skipping')
               return prev
             }
+            console.log('📨 Adding assistant message, prev count:', prev.length)
             return [...prev, newMessage]
           })
-
-          // Stop loading when we get an assistant message
-          setIsLoading(false)
         }
       )
       .subscribe()
@@ -130,7 +130,11 @@ export function useChat(): UseChatReturn {
         content: content.trim(),
         created_at: new Date().toISOString(),
       }
-      setMessages((prev) => [...prev, tempMessage])
+      console.log('📤 Adding optimistic message:', tempMessage.id, tempMessage.content)
+      setMessages((prev) => {
+        console.log('📤 Previous messages count:', prev.length)
+        return [...prev, tempMessage]
+      })
 
       try {
         const response = await fetch('/api/chat', {
