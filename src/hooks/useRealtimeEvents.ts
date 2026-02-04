@@ -66,6 +66,7 @@ export function useRealtimeEvents(
       })
       // Tool progress - update existing tool
       .on('broadcast', { event: 'tool:progress' }, ({ payload }) => {
+        console.log('⏳ tool:progress received:', payload)
         setTools(prev => prev.map(tool =>
           tool.toolCallId === payload.toolCallId
             ? { ...tool, status: 'progress', progress: payload.progress, message: payload.message }
@@ -74,6 +75,7 @@ export function useRealtimeEvents(
       })
       // Tool completed - update status to completed
       .on('broadcast', { event: 'tool:completed' }, ({ payload }) => {
+        console.log('✅ tool:completed received:', payload)
         setTools(prev => prev.map(tool =>
           tool.toolCallId === payload.toolCallId
             ? { ...tool, status: 'completed', progress: 100 }
@@ -82,9 +84,11 @@ export function useRealtimeEvents(
       })
       // Response events
       .on('broadcast', { event: 'response:chunk' }, ({ payload }) => {
+        console.log('📝 response:chunk received:', payload.text?.slice(0, 50) + (payload.text?.length > 50 ? '...' : ''))
         setStreamingMessage(prev => prev + payload.text)
       })
       .on('broadcast', { event: 'response:done' }, () => {
+        console.log('🏁 response:done received')
         setIsComplete(true)
       })
       // DB insert - merge completed data into existing tool
