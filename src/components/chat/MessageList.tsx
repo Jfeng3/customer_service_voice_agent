@@ -5,28 +5,55 @@ import type { MessageTurn, TurnToolCall } from '@/types/chat'
 
 interface MessageListProps {
   turns: MessageTurn[]
+  completedTurns: MessageTurn[] // Turns completed via broadcast but not yet in DB
   currentTurn: MessageTurn | null
   isLoading: boolean
 }
 
 export function MessageList({
   turns,
+  completedTurns,
   currentTurn,
   isLoading,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null)
 
-  // Combine historical turns with current active turn
+  // Combine: DB turns + completed broadcast turns + current active turn
   const allTurns = [...turns]
-  if (currentTurn && !turns.some(t => t.id === currentTurn.id)) {
-    allTurns.push(currentTurn)
-  } else if (currentTurn) {
-    // Replace the matching turn with currentTurn (for live updates)
-    const index = allTurns.findIndex(t => t.id === currentTurn.id)
-    if (index !== -1) {
-      allTurns[index] = currentTurn
+
+  // Merge in completedTurns (turns that finished via broadcast but not yet in DB)
+  for (const completedTurn of completedTurns) {
+    const existingIndex = allTurns.findIndex(t => t.id === completedTurn.id)
+    if (existingIndex === -1) {
+      // Not in DB yet, add from broadcast data
+      allTurns.push(completedTurn)
+    } else if (!allTurns[existingIndex].assistantResponse) {
+      // In DB but no assistant response yet, use broadcast data
+      allTurns[existingIndex] = {
+        ...allTurns[existingIndex],
+        ...completedTurn,
+        userQuery: allTurns[existingIndex].userQuery || completedTurn.userQuery,
+      }
     }
   }
+
+  // Merge in currentTurn (actively processing)
+  if (currentTurn && !allTurns.some(t => t.id === currentTurn.id)) {
+    allTurns.push(currentTurn)
+  } else if (currentTurn) {
+    // Merge currentTurn with existing turn (preserve userQuery from turns, use live data from currentTurn)
+    const index = allTurns.findIndex(t => t.id === currentTurn.id)
+    if (index !== -1) {
+      allTurns[index] = {
+        ...allTurns[index], // Keep userQuery and other data from historical turn
+        ...currentTurn,     // Overlay live data (toolCalls, streamingResponse, status)
+        userQuery: allTurns[index].userQuery || currentTurn.userQuery, // Prefer historical userQuery
+      }
+    }
+  }
+
+  // Sort by createdAt to maintain order
+  allTurns.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })

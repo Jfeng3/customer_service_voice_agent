@@ -23,7 +23,7 @@ export function ChatContainer() {
     stopSpeaking,
     isSupported: voiceSupported,
   } = useVoice()
-  const { currentTurn, reset } = useRealtimeEvents(
+  const { currentTurn, completedTurns, reset, clearCompletedTurn } = useRealtimeEvents(
     sessionId || null,
     { onProcessingStarted: stopSpeaking }
   )
@@ -43,18 +43,25 @@ export function ChatContainer() {
 
   // Reset when turn is complete and assistant message is in DB
   useEffect(() => {
-    if (currentTurn?.status === 'complete') {
-      // Check if this turn is now in the historical turns
-      const isInHistory = turns.some(t => t.assistantResponse)
-      if (isInHistory || currentTurn.assistantResponse) {
-        // Give a small delay for the DB message to arrive
-        const timer = setTimeout(() => {
-          reset()
-        }, 100)
-        return () => clearTimeout(timer)
+    if (currentTurn?.status === 'complete' && currentTurn.id) {
+      // Only reset when THIS specific turn has its assistant message in the historical turns
+      const turnInHistory = turns.find(t => t.id === currentTurn.id)
+      if (turnInHistory?.assistantResponse) {
+        // The DB message has arrived, safe to reset
+        reset()
       }
     }
-  }, [currentTurn?.status, currentTurn?.assistantResponse, turns, reset])
+  }, [currentTurn?.status, currentTurn?.id, turns, reset])
+
+  // Clear completed turns from buffer when they appear in DB
+  useEffect(() => {
+    for (const completedTurn of completedTurns) {
+      const turnInHistory = turns.find(t => t.id === completedTurn.id)
+      if (turnInHistory?.assistantResponse) {
+        clearCompletedTurn(completedTurn.id)
+      }
+    }
+  }, [completedTurns, turns, clearCompletedTurn])
 
   // Reset isLoading when response is complete
   useEffect(() => {
@@ -148,6 +155,7 @@ export function ChatContainer() {
         <div className="flex-1 overflow-hidden">
           <MessageList
             turns={turns}
+            completedTurns={completedTurns}
             currentTurn={currentTurn}
             isLoading={isLoading}
           />

@@ -11,8 +11,10 @@ interface UseRealtimeEventsOptions {
 
 interface UseRealtimeEventsReturn {
   currentTurn: MessageTurn | null
+  completedTurns: MessageTurn[] // Turns that completed but may not be in DB yet
   updateTurn: (turnId: string, updates: Partial<MessageTurn>) => void
   reset: () => void
+  clearCompletedTurn: (turnId: string) => void
 }
 
 export function useRealtimeEvents(
@@ -20,9 +22,15 @@ export function useRealtimeEvents(
   options?: UseRealtimeEventsOptions
 ): UseRealtimeEventsReturn {
   const [currentTurn, setCurrentTurn] = useState<MessageTurn | null>(null)
+  const [completedTurns, setCompletedTurns] = useState<MessageTurn[]>([])
 
   const reset = useCallback(() => {
     setCurrentTurn(null)
+  }, [])
+
+  // Remove a turn from completedTurns (called when it's confirmed in DB)
+  const clearCompletedTurn = useCallback((turnId: string) => {
+    setCompletedTurns(prev => prev.filter(t => t.id !== turnId))
   }, [])
 
   const updateTurn = useCallback((turnId: string, updates: Partial<MessageTurn>) => {
@@ -41,14 +49,21 @@ export function useRealtimeEvents(
         console.log('🚀 processing:started received:', payload)
         options?.onProcessingStarted?.()
 
-        // Create new turn
-        setCurrentTurn({
-          id: payload.turnId,
-          sessionId,
-          createdAt: new Date().toISOString(),
-          userQuery: '', // Will be filled by useChat
-          toolCalls: [],
-          status: 'pending',
+        // Save current turn to completedTurns before replacing (if it has content)
+        setCurrentTurn(prev => {
+          if (prev && (prev.streamingResponse || prev.assistantResponse || prev.toolCalls.length > 0)) {
+            console.log('💾 Saving previous turn to completedTurns:', prev.id)
+            setCompletedTurns(completed => [...completed, { ...prev, status: 'complete' }])
+          }
+          // Return new turn
+          return {
+            id: payload.turnId,
+            sessionId,
+            createdAt: new Date().toISOString(),
+            userQuery: '', // Will be filled by useChat
+            toolCalls: [],
+            status: 'pending',
+          }
         })
       })
       // Tool started - add new tool to turn
@@ -172,5 +187,5 @@ export function useRealtimeEvents(
     }
   }, [sessionId])
 
-  return { currentTurn, updateTurn, reset }
+  return { currentTurn, completedTurns, updateTurn, reset, clearCompletedTurn }
 }

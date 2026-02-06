@@ -32,12 +32,21 @@ function toTurnToolCall(tc: ToolCall): TurnToolCall {
 
 // Build turns from messages and tool calls using turn_id for grouping
 function buildTurns(messages: Message[], toolCalls: Record<string, ToolCall>): MessageTurn[] {
+  console.log('🔧 buildTurns called with messages:', messages.map(m => ({
+    id: m.id,
+    role: m.role,
+    turn_id: m.turn_id,
+  })))
+
   const turnMap = new Map<string, { user?: Message; assistant?: Message }>()
 
   // Group messages by turn_id
   for (const msg of messages) {
     const turnId = msg.turn_id
-    if (!turnId) continue // Skip messages without turn_id
+    if (!turnId) {
+      console.log('🔧 Skipping message without turn_id:', msg.id, msg.role)
+      continue
+    }
 
     if (!turnMap.has(turnId)) {
       turnMap.set(turnId, {})
@@ -75,6 +84,13 @@ function buildTurns(messages: Message[], toolCalls: Record<string, ToolCall>): M
 
   // Sort by created_at
   turns.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
+  console.log('🔧 buildTurns result:', turns.map(t => ({
+    id: t.id,
+    userQuery: t.userQuery?.slice(0, 30),
+    hasAssistant: !!t.assistantResponse,
+    status: t.status,
+  })))
 
   return turns
 }
@@ -157,7 +173,12 @@ export function useChat(): UseChatReturn {
         },
         (payload) => {
           const newMessage = payload.new as Message
-          console.log('📨 postgres_changes received:', newMessage.role, newMessage.id)
+          console.log('📨 postgres_changes received:', {
+            role: newMessage.role,
+            id: newMessage.id,
+            turn_id: newMessage.turn_id,
+            content: newMessage.content?.slice(0, 50),
+          })
 
           // Ignore user messages from DB - we already have the optimistic one
           if (newMessage.role === 'user') {
@@ -173,6 +194,7 @@ export function useChat(): UseChatReturn {
               return prev
             }
             console.log('📨 Adding assistant message, prev count:', prev.length)
+            console.log('📨 Current messages turn_ids:', prev.map(m => m.turn_id))
             return [...prev, newMessage]
           })
         }
