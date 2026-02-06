@@ -22,10 +22,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Save user message to database with turnId as the message ID
+    // Save user message to database with UUID id and turn_id for grouping
     await supabaseAdmin.from('csva_messages').insert({
-      id: resolvedTurnId,
       session_id: sessionId,
+      turn_id: resolvedTurnId,
       role: 'user',
       content: message,
     })

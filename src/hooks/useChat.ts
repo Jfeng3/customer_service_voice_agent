@@ -30,35 +30,51 @@ function toTurnToolCall(tc: ToolCall): TurnToolCall {
   }
 }
 
-// Build turns from messages and tool calls
+// Build turns from messages and tool calls using turn_id for grouping
 function buildTurns(messages: Message[], toolCalls: Record<string, ToolCall>): MessageTurn[] {
+  const turnMap = new Map<string, { user?: Message; assistant?: Message }>()
+
+  // Group messages by turn_id
+  for (const msg of messages) {
+    const turnId = msg.turn_id
+    if (!turnId) continue // Skip messages without turn_id
+
+    if (!turnMap.has(turnId)) {
+      turnMap.set(turnId, {})
+    }
+    const turn = turnMap.get(turnId)!
+    if (msg.role === 'user') {
+      turn.user = msg
+    } else {
+      turn.assistant = msg
+    }
+  }
+
+  // Convert to MessageTurn array, sorted by user message created_at
   const turns: MessageTurn[] = []
+  for (const [turnId, { user, assistant }] of turnMap) {
+    if (!user) continue // Must have a user message
 
-  for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i]
-    if (msg.role !== 'user') continue
-
-    // Find the immediately following assistant message (if any)
-    const nextMsg = messages[i + 1]
-    const assistantMsg = nextMsg?.role === 'assistant' ? nextMsg : undefined
-
-    // Get tool calls for this assistant message
-    const turnToolCalls = assistantMsg
+    // Get tool calls for the assistant message
+    const turnToolCalls = assistant
       ? Object.values(toolCalls)
-          .filter(tc => tc.message_id === assistantMsg.id)
+          .filter(tc => tc.message_id === assistant.id)
           .map(toTurnToolCall)
       : []
 
     turns.push({
-      id: msg.id,
-      sessionId: msg.session_id,
-      createdAt: msg.created_at,
-      userQuery: msg.content,
+      id: turnId,
+      sessionId: user.session_id,
+      createdAt: user.created_at,
+      userQuery: user.content,
       toolCalls: turnToolCalls,
-      assistantResponse: assistantMsg?.content,
-      status: assistantMsg ? 'complete' : 'pending',
+      assistantResponse: assistant?.content,
+      status: assistant ? 'complete' : 'pending',
     })
   }
+
+  // Sort by created_at
+  turns.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
   return turns
 }
@@ -175,13 +191,14 @@ export function useChat(): UseChatReturn {
       setError(null)
       setIsLoading(true)
 
-      // Generate turnId (same as user message ID)
+      // Generate turnId for grouping user + assistant messages
       const turnId = `turn_${nanoid()}`
 
       // Optimistically add user message
       const tempMessage: Message = {
-        id: turnId,
+        id: `temp_${nanoid()}`, // Temporary id for React key
         session_id: sessionId,
+        turn_id: turnId,
         role: 'user',
         content: content.trim(),
         created_at: new Date().toISOString(),
@@ -214,9 +231,9 @@ export function useChat(): UseChatReturn {
         setError(err instanceof Error ? err.message : 'Failed to send message')
         setIsLoading(false)
 
-        // Remove optimistic message on error
+        // Remove optimistic message on error (by turn_id)
         setMessages((prev) =>
-          prev.filter((m) => m.id !== tempMessage.id)
+          prev.filter((m) => m.turn_id !== turnId)
         )
         return null
       }

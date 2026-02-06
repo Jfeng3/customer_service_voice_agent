@@ -3,6 +3,7 @@
 export interface Message {
   id: string
   session_id: string
+  turn_id?: string // Groups user + assistant messages into a turn
   role: 'user' | 'assistant'
   content: string
   tool_calls?: string[] // UUIDs of related tool calls

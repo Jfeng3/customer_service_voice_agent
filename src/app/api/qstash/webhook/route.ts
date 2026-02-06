@@ -117,10 +117,11 @@ async function handler(request: NextRequest) {
       messageId,
     })
 
-    // 5. Save assistant response to database with the pre-generated ID
+    // 5. Save assistant response to database with turn_id for grouping
     await supabaseAdmin.from('csva_messages').insert({
       id: messageId, // Use the pre-generated ID
       session_id: sessionId,
+      turn_id: turnId, // Same turn_id as the user message
       role: 'assistant',
       content: assistantResponse,
       tool_calls: usedToolCallIds.length > 0 ? usedToolCallIds : null,
