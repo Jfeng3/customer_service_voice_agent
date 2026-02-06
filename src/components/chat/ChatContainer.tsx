@@ -21,11 +21,22 @@ export function ChatContainer() {
     isSpeaking,
     speak,
     stopSpeaking,
+    playAudioChunk,
+    clearAudioQueue,
     isSupported: voiceSupported,
   } = useVoice()
   const { currentTurn, completedTurns, reset, clearCompletedTurn } = useRealtimeEvents(
     sessionId || null,
-    { onProcessingStarted: stopSpeaking }
+    {
+      onProcessingStarted: () => {
+        stopSpeaking()
+        clearAudioQueue() // Clear any pending streaming audio
+      },
+      onAudioChunk: (audio, turnId) => {
+        // Play streaming audio chunks immediately
+        playAudioChunk(audio)
+      },
+    }
   )
 
   const [mounted, setMounted] = useState(false)
@@ -34,12 +45,8 @@ export function ChatContainer() {
     setMounted(true)
   }, [])
 
-  // Auto-speak assistant responses when complete
-  useEffect(() => {
-    if (currentTurn?.status === 'complete' && currentTurn.assistantResponse) {
-      speak(currentTurn.assistantResponse)
-    }
-  }, [currentTurn?.status, currentTurn?.assistantResponse, speak])
+  // Note: TTS is now handled via streaming audio chunks from useRealtimeEvents.onAudioChunk
+  // The old speak() call on complete response is no longer needed
 
   // Reset when turn is complete and assistant message is in DB
   useEffect(() => {

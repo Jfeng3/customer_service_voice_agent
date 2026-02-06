@@ -16,6 +16,10 @@ interface UseVoiceReturn {
   speak: (text: string) => Promise<void>
   stopSpeaking: () => void
 
+  // Streaming TTS (Web Audio API)
+  playAudioChunk: (base64Audio: string) => Promise<void>
+  clearAudioQueue: () => void
+
   // Errors
   error: string | null
   isSupported: boolean
@@ -33,6 +37,12 @@ export function useVoice(): UseVoiceReturn {
   const audioChunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Web Audio API refs for streaming playback
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const audioQueueRef = useRef<AudioBuffer[]>([])
+  const isPlayingRef = useRef(false)
+  const nextStartTimeRef = useRef(0)
 
   // Check browser support for MediaRecorder
   useEffect(() => {
@@ -202,6 +212,97 @@ export function useVoice(): UseVoiceReturn {
     }
   }, [])
 
+  // Helper to convert base64 to ArrayBuffer
+  const base64ToArrayBuffer = useCallback((base64: string): ArrayBuffer => {
+    const binaryString = atob(base64)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    return bytes.buffer
+  }, [])
+
+  // Play next audio buffer from queue with gapless playback
+  const scheduleNextChunk = useCallback(() => {
+    const ctx = audioContextRef.current
+    const buffer = audioQueueRef.current.shift()
+
+    if (!ctx || !buffer) {
+      if (audioQueueRef.current.length === 0) {
+        isPlayingRef.current = false
+        setIsSpeaking(false)
+      }
+      return
+    }
+
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.connect(ctx.destination)
+
+    // Schedule playback at the exact end time of the previous chunk for gapless audio
+    const startTime = Math.max(ctx.currentTime, nextStartTimeRef.current)
+    source.start(startTime)
+    nextStartTimeRef.current = startTime + buffer.duration
+
+    source.onended = () => {
+      // Check if there are more chunks to play
+      if (audioQueueRef.current.length > 0) {
+        scheduleNextChunk()
+      } else {
+        // Small delay before marking as not speaking to handle late arrivals
+        setTimeout(() => {
+          if (audioQueueRef.current.length === 0) {
+            isPlayingRef.current = false
+            setIsSpeaking(false)
+          }
+        }, 100)
+      }
+    }
+  }, [])
+
+  // Play incoming audio chunk from base64
+  const playAudioChunk = useCallback(async (base64Audio: string) => {
+    try {
+      // Initialize AudioContext on first call (must be after user interaction)
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext()
+        nextStartTimeRef.current = 0
+      }
+
+      // Resume if suspended (browser autoplay policy)
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+      }
+
+      const audioData = base64ToArrayBuffer(base64Audio)
+      const audioBuffer = await audioContextRef.current.decodeAudioData(audioData.slice(0))
+      audioQueueRef.current.push(audioBuffer)
+
+      // Start playing if not already
+      if (!isPlayingRef.current) {
+        isPlayingRef.current = true
+        setIsSpeaking(true)
+        scheduleNextChunk()
+      }
+    } catch (err) {
+      console.error('Failed to play audio chunk:', err)
+    }
+  }, [base64ToArrayBuffer, scheduleNextChunk])
+
+  // Clear audio queue (for interruption)
+  const clearAudioQueue = useCallback(() => {
+    audioQueueRef.current = []
+    isPlayingRef.current = false
+    nextStartTimeRef.current = 0
+    setIsSpeaking(false)
+
+    // Stop any currently playing audio by closing and recreating context
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+  }, [])
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -213,6 +314,9 @@ export function useVoice(): UseVoiceReturn {
       }
       if (audioRef.current) {
         audioRef.current.pause()
+      }
+      if (audioContextRef.current) {
+        audioContextRef.current.close()
       }
     }
   }, [])
@@ -227,6 +331,8 @@ export function useVoice(): UseVoiceReturn {
     isSpeaking,
     speak,
     stopSpeaking,
+    playAudioChunk,
+    clearAudioQueue,
     error,
     isSupported,
   }

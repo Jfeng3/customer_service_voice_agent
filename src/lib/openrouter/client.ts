@@ -156,7 +156,9 @@ Your role is to help customers with questions about:
 
 IMPORTANT: Always use the knowledge_qa tool FIRST to search our knowledge base before using web_search. Our knowledge base has accurate information about Rainie Beauty.
 
-Be warm, helpful, and professional. If you don't know something, offer to connect the customer with our team.`
+Be warm, helpful, and professional. If you don't know something, offer to connect the customer with our team.
+
+RESPONSE STYLE: Keep responses concise - 1 to 3 sentences maximum. This is a voice conversation, so be brief and natural. Get to the point quickly.`
 
   if (memoryContext) {
     systemPrompt += memoryContext
@@ -193,7 +195,7 @@ Be warm, helpful, and professional. If you don't know something, offer to connec
         model: MODEL,
         messages: allMessages,
         tools: tools.length > 0 ? tools : undefined,
-        stream: false, // TODO: Enable streaming later
+        stream: true, // Enable streaming for concurrent TTS
       }),
     })
 
@@ -211,15 +213,103 @@ Be warm, helpful, and professional. If you don't know something, offer to connec
       throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`)
     }
 
-    const data: OpenRouterResponse = await response.json()
-    const choice = data.choices[0]
-    const message = choice.message
+    if (!response.body) {
+      throw new Error('No response body for streaming')
+    }
+
+    // Parse streaming response
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let streamedContent = ''
+    let finishReason = ''
+    let toolCalls: ToolCall[] = []
+    let usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number } | null = null
+
+    // Track partial tool calls during streaming
+    const partialToolCalls: Map<number, { id: string; type: 'function'; function: { name: string; arguments: string } }> = new Map()
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        const data = line.slice(6).trim()
+        if (data === '[DONE]') continue
+
+        try {
+          const json = JSON.parse(data)
+          const delta = json.choices?.[0]?.delta
+
+          // Handle content chunks
+          if (delta?.content) {
+            streamedContent += delta.content
+            // Stream chunk to TTS immediately
+            if (onResponseChunk) {
+              await onResponseChunk(delta.content)
+            }
+          }
+
+          // Handle tool call chunks
+          if (delta?.tool_calls) {
+            for (const toolCallDelta of delta.tool_calls) {
+              const index = toolCallDelta.index
+              if (!partialToolCalls.has(index)) {
+                partialToolCalls.set(index, {
+                  id: toolCallDelta.id || '',
+                  type: 'function',
+                  function: { name: '', arguments: '' },
+                })
+              }
+              const partial = partialToolCalls.get(index)!
+              if (toolCallDelta.id) {
+                partial.id = toolCallDelta.id
+              }
+              if (toolCallDelta.function?.name) {
+                partial.function.name = toolCallDelta.function.name
+              }
+              if (toolCallDelta.function?.arguments) {
+                partial.function.arguments += toolCallDelta.function.arguments
+              }
+            }
+          }
+
+          // Capture finish reason
+          if (json.choices?.[0]?.finish_reason) {
+            finishReason = json.choices[0].finish_reason
+          }
+
+          // Capture usage from final chunk
+          if (json.usage) {
+            usage = json.usage
+          }
+        } catch (err) {
+          // Skip invalid JSON lines
+          console.warn('Failed to parse SSE line:', data)
+        }
+      }
+    }
+
+    // Convert partial tool calls to final array
+    toolCalls = Array.from(partialToolCalls.values()).filter(tc => tc.id && tc.function.name)
+
+    const message = {
+      role: 'assistant' as const,
+      content: streamedContent || null,
+      tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+    }
+    const choice = { message, finish_reason: finishReason }
 
     // Track token usage
-    if (data.usage) {
-      totalUsage.prompt_tokens += data.usage.prompt_tokens
-      totalUsage.completion_tokens += data.usage.completion_tokens
-      totalUsage.total_tokens += data.usage.total_tokens
+    if (usage) {
+      totalUsage.prompt_tokens += usage.prompt_tokens
+      totalUsage.completion_tokens += usage.completion_tokens
+      totalUsage.total_tokens += usage.total_tokens
     }
 
     // Log LLM call to Weave
@@ -231,7 +321,7 @@ Be warm, helpful, and professional. If you don't know something, offer to connec
       finishReason: choice.finish_reason,
       hasToolCalls: !!(message.tool_calls && message.tool_calls.length > 0),
       toolCallCount: message.tool_calls?.length || 0,
-      usage: data.usage || null,
+      usage: usage || null,
       inputMessages: allMessages.length,
     })
 
@@ -316,13 +406,9 @@ Be warm, helpful, and professional. If you don't know something, offer to connec
       continueLoop = true
     } else {
       // No tool calls, this is the final response
+      // Content was already streamed via onResponseChunk during SSE parsing
       finalContent = message.content || ''
       continueLoop = false
-
-      // Stream response chunks (for now, send as single chunk)
-      if (onResponseChunk && finalContent) {
-        await onResponseChunk(finalContent)
-      }
     }
   }
 

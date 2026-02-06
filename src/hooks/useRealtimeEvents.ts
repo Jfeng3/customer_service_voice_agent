@@ -7,6 +7,7 @@ import type { ToolCallRecord } from '@/types/events'
 
 interface UseRealtimeEventsOptions {
   onProcessingStarted?: () => void
+  onAudioChunk?: (audio: string, turnId: string) => void
 }
 
 interface UseRealtimeEventsReturn {
@@ -144,6 +145,13 @@ export function useRealtimeEvents(
             assistantResponse: prev.streamingResponse || '',
           }
         })
+      })
+      // Audio chunk - forward to player
+      .on('broadcast', { event: 'audio:chunk' }, ({ payload }) => {
+        console.log('🔊 audio:chunk received, size:', payload.audio?.length)
+        if (payload.audio && payload.turnId) {
+          options?.onAudioChunk?.(payload.audio, payload.turnId)
+        }
       })
       // DB insert - merge completed data into existing tool (for duration, output, etc.)
       .on(

@@ -4,6 +4,7 @@ import { supabaseAdmin, broadcastEvent } from '@/lib/supabase/server'
 import { callOpenRouter } from '@/lib/openrouter/client'
 import { executeTool, toolDefinitions } from '@/tools'
 import { getMemoryContext, extractAndStoreMemories } from '@/lib/memory/client'
+import { ElevenLabsWebSocket, arrayBufferToBase64 } from '@/lib/elevenlabs/websocket'
 import type { Message } from '@/types/chat'
 
 function generateUUID(): string {
@@ -61,6 +62,31 @@ async function handler(request: NextRequest) {
     let assistantResponse = ''
     const usedToolCallIds: string[] = []
 
+    // 3.5. Create ElevenLabs WebSocket for concurrent TTS
+    let elevenWs: ElevenLabsWebSocket | null = null
+    let ttsConnected = false
+
+    try {
+      elevenWs = new ElevenLabsWebSocket(
+        (audioChunk) => {
+          // Broadcast audio chunk to frontend immediately
+          broadcastEvent(sessionId, 'audio:chunk', {
+            turnId,
+            audio: arrayBufferToBase64(audioChunk),
+          })
+        },
+        (error) => {
+          console.error('ElevenLabs WebSocket error:', error)
+        }
+      )
+      await elevenWs.connect()
+      ttsConnected = true
+      console.log('🔊 ElevenLabs WebSocket connected for session:', sessionId)
+    } catch (error) {
+      console.error('Failed to connect to ElevenLabs WebSocket:', error)
+      // Continue without TTS streaming - fallback to non-streaming
+    }
+
     try {
       const result = await callOpenRouter({
         messages: openRouterMessages,
@@ -96,7 +122,12 @@ async function handler(request: NextRequest) {
         },
         onResponseChunk: async (text) => {
           assistantResponse += text
+          // Broadcast text chunk to frontend
           await broadcastEvent(sessionId, 'response:chunk', { turnId, text })
+          // Send text to ElevenLabs for concurrent TTS
+          if (elevenWs && ttsConnected) {
+            elevenWs.sendText(text)
+          }
         },
         executeTool,
       })
@@ -109,6 +140,18 @@ async function handler(request: NextRequest) {
         turnId,
         text: assistantResponse,
       })
+      // Send error message to TTS as well
+      if (elevenWs && ttsConnected) {
+        elevenWs.sendText(assistantResponse)
+      }
+    }
+
+    // Flush remaining audio from ElevenLabs
+    if (elevenWs && ttsConnected) {
+      elevenWs.flush()
+      // Wait a moment for final audio chunks to arrive
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      elevenWs.close()
     }
 
     // 4. Broadcast response done with the message ID and turnId
