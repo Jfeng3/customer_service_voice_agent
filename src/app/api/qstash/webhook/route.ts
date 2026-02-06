@@ -13,16 +13,17 @@ function generateUUID(): string {
 interface WebhookPayload {
   sessionId: string
   message: string
+  turnId: string
   timestamp: number
 }
 
 async function handler(request: NextRequest) {
   try {
     const payload: WebhookPayload = await request.json()
-    const { sessionId, message } = payload
+    const { sessionId, message, turnId } = payload
 
     // 0. Notify frontend that processing started (cuts TTS from previous message)
-    await broadcastEvent(sessionId, 'processing:started', { timestamp: Date.now() })
+    await broadcastEvent(sessionId, 'processing:started', { turnId, timestamp: Date.now() })
 
     // 1. Load conversation history from Supabase
     const { data: historyData } = await supabaseAdmin
@@ -69,22 +70,25 @@ async function handler(request: NextRequest) {
         memoryContext,
         onToolStart: async (toolName, toolCallId) => {
           await broadcastEvent(sessionId, 'tool:started', {
+            turnId,
             toolName,
             toolCallId,
             messageId, // Include message ID so frontend knows which message this tool belongs to
           })
         },
-        onToolProgress: async (toolName, toolCallId, progress, message) => {
+        onToolProgress: async (toolName, toolCallId, progress, progressMessage) => {
           await broadcastEvent(sessionId, 'tool:progress', {
+            turnId,
             toolName,
             toolCallId,
             progress,
-            message,
+            message: progressMessage,
           })
         },
         onToolComplete: async (toolName, toolCallId, result) => {
           usedToolCallIds.push(toolCallId)
           await broadcastEvent(sessionId, 'tool:completed', {
+            turnId,
             toolName,
             toolCallId,
             result,
@@ -92,7 +96,7 @@ async function handler(request: NextRequest) {
         },
         onResponseChunk: async (text) => {
           assistantResponse += text
-          await broadcastEvent(sessionId, 'response:chunk', { text })
+          await broadcastEvent(sessionId, 'response:chunk', { turnId, text })
         },
         executeTool,
       })
@@ -102,12 +106,14 @@ async function handler(request: NextRequest) {
       console.error('OpenRouter error:', error)
       assistantResponse = 'Sorry, I encountered an error processing your request.'
       await broadcastEvent(sessionId, 'response:chunk', {
+        turnId,
         text: assistantResponse,
       })
     }
 
-    // 4. Broadcast response done with the message ID
+    // 4. Broadcast response done with the message ID and turnId
     await broadcastEvent(sessionId, 'response:done', {
+      turnId,
       messageId,
     })
 

@@ -2,28 +2,16 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import type { MessageTurn, TurnToolCall } from '@/types/chat'
 import type { ToolCallRecord } from '@/types/events'
-
-// Unified tool state - tracks both progress and completed results
-export interface UnifiedToolState {
-  toolCallId: string
-  toolName: string
-  messageId: string // The assistant message this tool belongs to
-  status: 'started' | 'progress' | 'completed'
-  progress: number
-  message?: string
-  // Completed data (from DB)
-  completed?: ToolCallRecord
-}
 
 interface UseRealtimeEventsOptions {
   onProcessingStarted?: () => void
 }
 
 interface UseRealtimeEventsReturn {
-  tools: UnifiedToolState[]
-  streamingMessage: string
-  isComplete: boolean
+  currentTurn: MessageTurn | null
+  updateTurn: (turnId: string, updates: Partial<MessageTurn>) => void
   reset: () => void
 }
 
@@ -31,67 +19,118 @@ export function useRealtimeEvents(
   sessionId: string | null,
   options?: UseRealtimeEventsOptions
 ): UseRealtimeEventsReturn {
-  const [tools, setTools] = useState<UnifiedToolState[]>([])
-  const [streamingMessage, setStreamingMessage] = useState('')
-  const [isComplete, setIsComplete] = useState(false)
+  const [currentTurn, setCurrentTurn] = useState<MessageTurn | null>(null)
 
   const reset = useCallback(() => {
-    setTools([])
-    setStreamingMessage('')
-    setIsComplete(false)
+    setCurrentTurn(null)
+  }, [])
+
+  const updateTurn = useCallback((turnId: string, updates: Partial<MessageTurn>) => {
+    setCurrentTurn(prev => {
+      if (!prev || prev.id !== turnId) return prev
+      return { ...prev, ...updates }
+    })
   }, [])
 
   useEffect(() => {
     if (!sessionId) return
 
     const channel = supabase.channel(`session:${sessionId}`)
-      // Processing started - cut TTS from previous message
-      .on('broadcast', { event: 'processing:started' }, () => {
-        console.log('🚀 processing:started received - cutting TTS')
+      // Processing started - cut TTS from previous message and create new turn
+      .on('broadcast', { event: 'processing:started' }, ({ payload }) => {
+        console.log('🚀 processing:started received:', payload)
         options?.onProcessingStarted?.()
+
+        // Create new turn
+        setCurrentTurn({
+          id: payload.turnId,
+          sessionId,
+          createdAt: new Date().toISOString(),
+          userQuery: '', // Will be filled by useChat
+          toolCalls: [],
+          status: 'pending',
+        })
       })
-      // Tool started - add new tool to list
+      // Tool started - add new tool to turn
       .on('broadcast', { event: 'tool:started' }, ({ payload }) => {
         console.log('🔧 tool:started received:', payload)
-        setTools(prev => [
-          ...prev,
-          {
-            toolCallId: payload.toolCallId,
+        setCurrentTurn(prev => {
+          if (!prev || prev.id !== payload.turnId) return prev
+
+          const newTool: TurnToolCall = {
+            id: payload.toolCallId,
             toolName: payload.toolName,
-            messageId: payload.messageId, // Track which message this tool belongs to
-            status: 'started',
+            input: {},
+            status: 'running',
             progress: 0,
           }
-        ])
+
+          return {
+            ...prev,
+            status: 'tools_running',
+            toolCalls: [...prev.toolCalls, newTool],
+          }
+        })
       })
       // Tool progress - update existing tool
       .on('broadcast', { event: 'tool:progress' }, ({ payload }) => {
         console.log('⏳ tool:progress received:', payload)
-        setTools(prev => prev.map(tool =>
-          tool.toolCallId === payload.toolCallId
-            ? { ...tool, status: 'progress', progress: payload.progress, message: payload.message }
-            : tool
-        ))
+        setCurrentTurn(prev => {
+          if (!prev || prev.id !== payload.turnId) return prev
+
+          return {
+            ...prev,
+            toolCalls: prev.toolCalls.map(tool =>
+              tool.id === payload.toolCallId
+                ? { ...tool, progress: payload.progress, progressMessage: payload.message }
+                : tool
+            ),
+          }
+        })
       })
       // Tool completed - update status to completed
       .on('broadcast', { event: 'tool:completed' }, ({ payload }) => {
         console.log('✅ tool:completed received:', payload)
-        setTools(prev => prev.map(tool =>
-          tool.toolCallId === payload.toolCallId
-            ? { ...tool, status: 'completed', progress: 100 }
-            : tool
-        ))
+        setCurrentTurn(prev => {
+          if (!prev || prev.id !== payload.turnId) return prev
+
+          return {
+            ...prev,
+            toolCalls: prev.toolCalls.map(tool =>
+              tool.id === payload.toolCallId
+                ? { ...tool, status: 'completed', progress: 100 }
+                : tool
+            ),
+          }
+        })
       })
-      // Response events
+      // Response chunk - append to streaming response
       .on('broadcast', { event: 'response:chunk' }, ({ payload }) => {
         console.log('📝 response:chunk received:', payload.text?.slice(0, 50) + (payload.text?.length > 50 ? '...' : ''))
-        setStreamingMessage(prev => prev + payload.text)
+        setCurrentTurn(prev => {
+          if (!prev || prev.id !== payload.turnId) return prev
+
+          return {
+            ...prev,
+            status: 'responding',
+            streamingResponse: (prev.streamingResponse || '') + payload.text,
+          }
+        })
       })
-      .on('broadcast', { event: 'response:done' }, () => {
-        console.log('🏁 response:done received')
-        setIsComplete(true)
+      // Response done - mark turn complete
+      .on('broadcast', { event: 'response:done' }, ({ payload }) => {
+        console.log('🏁 response:done received:', payload)
+        setCurrentTurn(prev => {
+          if (!prev || prev.id !== payload.turnId) return prev
+
+          return {
+            ...prev,
+            status: 'complete',
+            assistantResponse: prev.streamingResponse || '',
+          }
+        })
       })
-      // DB insert - merge completed data into existing tool
+      // DB insert - merge completed data into existing tool (for duration, output, etc.)
       .on(
         'postgres_changes',
         {
@@ -107,13 +146,22 @@ export function useRealtimeEvents(
             tool_call_id: record.tool_call_id,
             tool_name: record.tool_name,
           })
-          setTools(prev => {
-            console.log('📥 Matching against tools:', prev.map(t => ({ toolCallId: t.toolCallId, toolName: t.toolName })))
-            return prev.map(tool =>
-              tool.toolCallId === record.tool_call_id
-                ? { ...tool, completed: record }
-                : tool
-            )
+          setCurrentTurn(prev => {
+            if (!prev) return prev
+
+            return {
+              ...prev,
+              toolCalls: prev.toolCalls.map(tool =>
+                tool.id === record.tool_call_id
+                  ? {
+                      ...tool,
+                      output: record.output,
+                      durationMs: record.duration_ms,
+                      input: record.input,
+                    }
+                  : tool
+              ),
+            }
           })
         }
       )
@@ -124,5 +172,5 @@ export function useRealtimeEvents(
     }
   }, [sessionId])
 
-  return { tools, streamingMessage, isComplete, reset }
+  return { currentTurn, updateTurn, reset }
 }

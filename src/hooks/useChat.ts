@@ -1,19 +1,66 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { nanoid } from 'nanoid'
 import { supabase } from '@/lib/supabase/client'
-import type { Message, ToolCall } from '@/types/chat'
+import type { Message, ToolCall, MessageTurn, TurnToolCall } from '@/types/chat'
 
 interface UseChatReturn {
   messages: Message[]
   toolCalls: Record<string, ToolCall> // keyed by tool call ID
+  turns: MessageTurn[]
   isLoading: boolean
   sessionId: string
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string) => Promise<string | null> // Returns turnId
   clearMessages: () => void
   resetLoading: () => void
   error: string | null
+}
+
+// Convert DB ToolCall to TurnToolCall
+function toTurnToolCall(tc: ToolCall): TurnToolCall {
+  return {
+    id: tc.id,
+    toolName: tc.tool_name,
+    input: tc.input,
+    output: tc.output,
+    status: tc.status === 'completed' ? 'completed' : tc.status === 'failed' ? 'error' : 'running',
+    progress: tc.status === 'completed' ? 100 : 0,
+    durationMs: tc.duration_ms,
+  }
+}
+
+// Build turns from messages and tool calls
+function buildTurns(messages: Message[], toolCalls: Record<string, ToolCall>): MessageTurn[] {
+  const turns: MessageTurn[] = []
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    if (msg.role !== 'user') continue
+
+    // Find the immediately following assistant message (if any)
+    const nextMsg = messages[i + 1]
+    const assistantMsg = nextMsg?.role === 'assistant' ? nextMsg : undefined
+
+    // Get tool calls for this assistant message
+    const turnToolCalls = assistantMsg
+      ? Object.values(toolCalls)
+          .filter(tc => tc.message_id === assistantMsg.id)
+          .map(toTurnToolCall)
+      : []
+
+    turns.push({
+      id: msg.id,
+      sessionId: msg.session_id,
+      createdAt: msg.created_at,
+      userQuery: msg.content,
+      toolCalls: turnToolCalls,
+      assistantResponse: assistantMsg?.content,
+      status: assistantMsg ? 'complete' : 'pending',
+    })
+  }
+
+  return turns
 }
 
 export function useChat(): UseChatReturn {
@@ -22,6 +69,12 @@ export function useChat(): UseChatReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
+
+  // Build turns from messages and tool calls
+  const turns = useMemo(
+    () => buildTurns(messages, toolCalls),
+    [messages, toolCalls]
+  )
 
   // Generate sessionId only on client to avoid hydration mismatch
   useEffect(() => {
@@ -116,15 +169,18 @@ export function useChat(): UseChatReturn {
   }, [sessionId])
 
   const sendMessage = useCallback(
-    async (content: string) => {
-      if (!content.trim() || !sessionId) return
+    async (content: string): Promise<string | null> => {
+      if (!content.trim() || !sessionId) return null
 
       setError(null)
       setIsLoading(true)
 
+      // Generate turnId (same as user message ID)
+      const turnId = `turn_${nanoid()}`
+
       // Optimistically add user message
       const tempMessage: Message = {
-        id: `temp_${nanoid()}`,
+        id: turnId,
         session_id: sessionId,
         role: 'user',
         content: content.trim(),
@@ -143,6 +199,7 @@ export function useChat(): UseChatReturn {
           body: JSON.stringify({
             sessionId,
             message: content.trim(),
+            turnId,
           }),
         })
 
@@ -150,6 +207,8 @@ export function useChat(): UseChatReturn {
           const data = await response.json()
           throw new Error(data.error || 'Failed to send message')
         }
+
+        return turnId
       } catch (err) {
         console.error('Send message error:', err)
         setError(err instanceof Error ? err.message : 'Failed to send message')
@@ -159,6 +218,7 @@ export function useChat(): UseChatReturn {
         setMessages((prev) =>
           prev.filter((m) => m.id !== tempMessage.id)
         )
+        return null
       }
     },
     [sessionId]
@@ -175,6 +235,7 @@ export function useChat(): UseChatReturn {
   return {
     messages,
     toolCalls,
+    turns,
     isLoading,
     sessionId,
     sendMessage,

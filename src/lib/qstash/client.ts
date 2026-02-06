@@ -11,7 +11,7 @@ export const qstash = new Client({
 })
 
 // Publish a chat message to QStash for async processing
-export async function publishChatMessage(sessionId: string, message: string) {
+export async function publishChatMessage(sessionId: string, message: string, turnId: string) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const webhookUrl = `${appUrl}/api/qstash/webhook`
 
@@ -20,6 +20,7 @@ export async function publishChatMessage(sessionId: string, message: string) {
     body: {
       sessionId,
       message,
+      turnId,
       timestamp: Date.now(),
     },
     retries: 3,

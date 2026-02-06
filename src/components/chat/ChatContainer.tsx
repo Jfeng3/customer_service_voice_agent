@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useChat } from '@/hooks/useChat'
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents'
 import { useVoice } from '@/hooks/useVoice'
@@ -8,9 +8,10 @@ import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { VoiceOrb } from '@/components/voice/VoiceOrb'
 import { StatusBadge } from '@/components/voice/StatusBadge'
+import type { MessageTurn } from '@/types/chat'
 
 export function ChatContainer() {
-  const { messages, toolCalls, isLoading, sessionId, sendMessage, resetLoading, error } = useChat()
+  const { turns, isLoading, sessionId, sendMessage, resetLoading, error } = useChat()
   const {
     isListening,
     isTranscribing,
@@ -23,47 +24,87 @@ export function ChatContainer() {
     stopSpeaking,
     isSupported: voiceSupported,
   } = useVoice()
-  const { tools, streamingMessage, isComplete, reset } = useRealtimeEvents(
+  const { currentTurn, reset } = useRealtimeEvents(
     sessionId || null,
     { onProcessingStarted: stopSpeaking }
   )
 
   const [mounted, setMounted] = useState(false)
+  const [pendingUserQuery, setPendingUserQuery] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Auto-speak assistant responses when complete
-  useEffect(() => {
-    if (isComplete && streamingMessage) {
-      speak(streamingMessage)
+  // Create a merged turn that includes the pending user query if available
+  const mergedCurrentTurn = useMemo((): MessageTurn | null => {
+    if (!currentTurn) {
+      // No current turn from realtime, but we might have a pending message
+      if (pendingUserQuery && isLoading) {
+        return {
+          id: 'pending',
+          sessionId: sessionId,
+          createdAt: new Date().toISOString(),
+          userQuery: pendingUserQuery,
+          toolCalls: [],
+          status: 'pending',
+        }
+      }
+      return null
     }
-  }, [isComplete, streamingMessage, speak])
 
-  // Reset only when assistant message appears in messages array
-  useEffect(() => {
-    if (isComplete && streamingMessage) {
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage?.role === 'assistant') {
-        reset()
+    // Merge pending user query into current turn if it doesn't have one
+    if (!currentTurn.userQuery && pendingUserQuery) {
+      return {
+        ...currentTurn,
+        userQuery: pendingUserQuery,
       }
     }
-  }, [isComplete, streamingMessage, messages, reset])
+
+    return currentTurn
+  }, [currentTurn, pendingUserQuery, isLoading, sessionId])
+
+  // Auto-speak assistant responses when complete
+  useEffect(() => {
+    if (currentTurn?.status === 'complete' && currentTurn.assistantResponse) {
+      speak(currentTurn.assistantResponse)
+    }
+  }, [currentTurn?.status, currentTurn?.assistantResponse, speak])
+
+  // Reset when turn is complete and assistant message is in DB
+  useEffect(() => {
+    if (currentTurn?.status === 'complete') {
+      // Check if this turn is now in the historical turns
+      const isInHistory = turns.some(t => t.assistantResponse)
+      if (isInHistory || currentTurn.assistantResponse) {
+        // Give a small delay for the DB message to arrive
+        const timer = setTimeout(() => {
+          reset()
+          setPendingUserQuery(null)
+        }, 100)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [currentTurn?.status, currentTurn?.assistantResponse, turns, reset])
 
   // Reset isLoading when response is complete
-  // This is the primary mechanism since postgres_changes on csva_messages may not be enabled
   useEffect(() => {
-    if (isComplete) {
+    if (currentTurn?.status === 'complete') {
       resetLoading()
     }
-  }, [isComplete, resetLoading])
+  }, [currentTurn?.status, resetLoading])
+
+  // Handle sending a message
+  const handleSendMessage = async (content: string) => {
+    setPendingUserQuery(content)
+    await sendMessage(content)
+  }
 
   // Send voice transcript as message
   const handleVoiceStop = async () => {
     const transcribedText = await stopListening()
     if (transcribedText.trim()) {
-      sendMessage(transcribedText.trim())
+      handleSendMessage(transcribedText.trim())
       clearTranscript()
     }
   }
@@ -143,10 +184,8 @@ export function ChatContainer() {
         {/* Messages area */}
         <div className="flex-1 overflow-hidden">
           <MessageList
-            messages={messages}
-            historicalToolCalls={toolCalls}
-            activeTools={tools}
-            streamingMessage={streamingMessage}
+            turns={turns}
+            currentTurn={mergedCurrentTurn}
             isLoading={isLoading}
           />
         </div>
@@ -159,7 +198,7 @@ export function ChatContainer() {
               {/* Text input */}
               <div className="flex-1 min-w-0">
                 <InputArea
-                  onSend={sendMessage}
+                  onSend={handleSendMessage}
                   disabled={isLoading || isListening || isTranscribing}
                 />
               </div>
