@@ -1,7 +1,7 @@
 // ElevenLabs WebSocket streaming TTS client
 import WebSocket from 'ws'
 
-const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL' // Bella voice
+const VOICE_ID = process.env.ELEVENLABS_VOICE_ID
 const MODEL_ID = 'eleven_flash_v2_5' // 75ms TTFB vs ~1s for eleven_v3
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
 
@@ -32,6 +32,10 @@ export class ElevenLabsWebSocket {
     this.connectionPromise = new Promise((resolve, reject) => {
       if (!ELEVENLABS_API_KEY) {
         reject(new Error('ELEVENLABS_API_KEY not configured'))
+        return
+      }
+      if (!VOICE_ID) {
+        reject(new Error('ELEVENLABS_VOICE_ID not configured'))
         return
       }
 

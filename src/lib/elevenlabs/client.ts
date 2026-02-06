@@ -1,7 +1,7 @@
 // ElevenLabs TTS client (fallback for non-streaming)
 
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY
-const VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL' // Bella voice
+const VOICE_ID = process.env.ELEVENLABS_VOICE_ID
 
 interface TTSOptions {
   text: string
@@ -14,6 +14,9 @@ export async function textToSpeech(options: TTSOptions): Promise<ArrayBuffer> {
 
   if (!ELEVENLABS_API_KEY) {
     throw new Error('ELEVENLABS_API_KEY not configured')
+  }
+  if (!voiceId) {
+    throw new Error('ELEVENLABS_VOICE_ID not configured')
   }
 
   const response = await fetch(
@@ -50,6 +53,9 @@ export async function textToSpeechStream(options: TTSOptions): Promise<ReadableS
 
   if (!ELEVENLABS_API_KEY) {
     throw new Error('ELEVENLABS_API_KEY not configured')
+  }
+  if (!voiceId) {
+    throw new Error('ELEVENLABS_VOICE_ID not configured')
   }
 
   const response = await fetch(
