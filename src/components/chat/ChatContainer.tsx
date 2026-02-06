@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useChat } from '@/hooks/useChat'
 import { useRealtimeEvents } from '@/hooks/useRealtimeEvents'
 import { useVoice } from '@/hooks/useVoice'
@@ -8,7 +8,6 @@ import { MessageList } from './MessageList'
 import { InputArea } from './InputArea'
 import { VoiceOrb } from '@/components/voice/VoiceOrb'
 import { StatusBadge } from '@/components/voice/StatusBadge'
-import type { MessageTurn } from '@/types/chat'
 
 export function ChatContainer() {
   const { turns, isLoading, sessionId, sendMessage, resetLoading, error } = useChat()
@@ -30,39 +29,10 @@ export function ChatContainer() {
   )
 
   const [mounted, setMounted] = useState(false)
-  const [pendingUserQuery, setPendingUserQuery] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  // Create a merged turn that includes the pending user query if available
-  const mergedCurrentTurn = useMemo((): MessageTurn | null => {
-    if (!currentTurn) {
-      // No current turn from realtime, but we might have a pending message
-      if (pendingUserQuery && isLoading) {
-        return {
-          id: 'pending',
-          sessionId: sessionId,
-          createdAt: new Date().toISOString(),
-          userQuery: pendingUserQuery,
-          toolCalls: [],
-          status: 'pending',
-        }
-      }
-      return null
-    }
-
-    // Merge pending user query into current turn if it doesn't have one
-    if (!currentTurn.userQuery && pendingUserQuery) {
-      return {
-        ...currentTurn,
-        userQuery: pendingUserQuery,
-      }
-    }
-
-    return currentTurn
-  }, [currentTurn, pendingUserQuery, isLoading, sessionId])
 
   // Auto-speak assistant responses when complete
   useEffect(() => {
@@ -80,7 +50,6 @@ export function ChatContainer() {
         // Give a small delay for the DB message to arrive
         const timer = setTimeout(() => {
           reset()
-          setPendingUserQuery(null)
         }, 100)
         return () => clearTimeout(timer)
       }
@@ -94,17 +63,11 @@ export function ChatContainer() {
     }
   }, [currentTurn?.status, resetLoading])
 
-  // Handle sending a message
-  const handleSendMessage = async (content: string) => {
-    setPendingUserQuery(content)
-    await sendMessage(content)
-  }
-
   // Send voice transcript as message
   const handleVoiceStop = async () => {
     const transcribedText = await stopListening()
     if (transcribedText.trim()) {
-      handleSendMessage(transcribedText.trim())
+      sendMessage(transcribedText.trim())
       clearTranscript()
     }
   }
@@ -185,7 +148,7 @@ export function ChatContainer() {
         <div className="flex-1 overflow-hidden">
           <MessageList
             turns={turns}
-            currentTurn={mergedCurrentTurn}
+            currentTurn={currentTurn}
             isLoading={isLoading}
           />
         </div>
@@ -198,7 +161,7 @@ export function ChatContainer() {
               {/* Text input */}
               <div className="flex-1 min-w-0">
                 <InputArea
-                  onSend={handleSendMessage}
+                  onSend={sendMessage}
                   disabled={isLoading || isListening || isTranscribing}
                 />
               </div>
