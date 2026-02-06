@@ -66,6 +66,19 @@ async function handler(request: NextRequest) {
     let elevenWs: ElevenLabsWebSocket | null = null
     let ttsConnected = false
 
+    // Sentence buffer for natural TTS prosody
+    let sentenceBuffer = ''
+
+    // Sentence boundary detection (handles common abbreviations)
+    const ABBREVS = /(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|vs|etc|Inc|Ltd|Corp|St|Ave|Blvd|Rd)\.\s*$/i
+    const SENTENCE_END = /[.!?]\s*$/
+
+    function isSentenceEnd(text: string): boolean {
+      if (!SENTENCE_END.test(text)) return false
+      if (ABBREVS.test(text)) return false
+      return true
+    }
+
     try {
       elevenWs = new ElevenLabsWebSocket(
         (audioChunk) => {
@@ -122,17 +135,29 @@ async function handler(request: NextRequest) {
         },
         onResponseChunk: async (text) => {
           assistantResponse += text
-          // Broadcast text chunk to frontend
+          sentenceBuffer += text
+
+          // Broadcast text chunk to frontend (keep streaming text)
           await broadcastEvent(sessionId, 'response:chunk', { turnId, text })
-          // Send text to ElevenLabs for concurrent TTS
-          if (elevenWs && ttsConnected) {
-            elevenWs.sendText(text)
+
+          // Check for sentence boundary before sending to TTS
+          if (isSentenceEnd(sentenceBuffer) && elevenWs && ttsConnected) {
+            console.log('🔊 Sending sentence to TTS:', sentenceBuffer.trim())
+            elevenWs.sendText(sentenceBuffer)
+            sentenceBuffer = '' // Reset buffer
           }
         },
         executeTool,
       })
 
       assistantResponse = result.content
+
+      // Send any remaining text in the sentence buffer to TTS
+      if (sentenceBuffer.trim() && elevenWs && ttsConnected) {
+        console.log('🔊 Sending final fragment to TTS:', sentenceBuffer.trim())
+        elevenWs.sendText(sentenceBuffer)
+        sentenceBuffer = ''
+      }
     } catch (error) {
       console.error('OpenRouter error:', error)
       assistantResponse = 'Sorry, I encountered an error processing your request.'
