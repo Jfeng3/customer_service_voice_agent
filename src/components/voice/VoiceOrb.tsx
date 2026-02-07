@@ -135,21 +135,29 @@ export function VoiceOrb({
         onTouchEnd={handleTouchEnd}
         disabled={disabled}
         className={`
-          relative w-14 h-14 sm:w-14 sm:h-14 rounded-full
+          relative rounded-full
           flex items-center justify-center
           transition-all duration-300 ease-out
           focus-ring select-none
           touch-manipulation
+          ${isListening ? 'w-16 h-16 sm:w-18 sm:h-18' : 'w-14 h-14'}
           ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-90'}
           ${state === 'idle' ? 'animate-breathe' : ''}
+          ${isListening ? 'ring-4 ring-red-500/50 ring-offset-2 ring-offset-transparent' : ''}
         `}
         style={{
           background: orbStyles.background,
-          boxShadow: orbStyles.boxShadow,
+          boxShadow: isListening
+            ? '0 0 60px rgba(220, 38, 38, 0.6), 0 0 100px rgba(220, 38, 38, 0.3), inset 0 0 20px rgba(255,255,255,0.2)'
+            : orbStyles.boxShadow,
           transform: `scale(${orbStyles.scale})`,
         }}
         aria-label={isListening ? 'Click to stop recording' : 'Click to start recording'}
       >
+        {/* Recording indicator dot */}
+        {isListening && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse border-2 border-white shadow-lg pointer-events-none" />
+        )}
         {/* Inner highlight */}
         <div
           className="absolute inset-[3px] rounded-full opacity-40 pointer-events-none"
@@ -194,19 +202,21 @@ export function VoiceOrb({
 
 function MicrophoneIcon({ isActive }: { isActive: boolean }) {
   return (
-    <svg
-      className={`w-5 h-5 sm:w-6 sm:h-6 text-white transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-      />
-    </svg>
+    <div className={`relative ${isActive ? 'animate-pulse' : ''}`}>
+      <svg
+        className={`w-6 h-6 sm:w-7 sm:h-7 text-white transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}
+        viewBox="0 0 24 24"
+        fill={isActive ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={isActive ? 1.5 : 2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+        />
+      </svg>
+    </div>
   )
 }
 
