@@ -16,11 +16,11 @@ export class DeepgramStreamingClient {
     this.onError = onError
   }
 
-  async connect(apiKey: string, language: string = 'zh'): Promise<void> {
+  async connect(apiKey: string): Promise<void> {
     const url = new URL('wss://api.deepgram.com/v1/listen')
-    // Use Nova-2 model with specified language
+    // Use Nova-2 with multilingual support - auto-detects English, Chinese, etc.
     url.searchParams.set('model', 'nova-2')
-    url.searchParams.set('language', language) // 'zh' for Chinese, 'en' for English
+    url.searchParams.set('language', 'multi')
     url.searchParams.set('smart_format', 'true')
     url.searchParams.set('punctuate', 'true')
     url.searchParams.set('interim_results', 'true')
