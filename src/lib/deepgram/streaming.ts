@@ -18,8 +18,8 @@ export class DeepgramStreamingClient {
 
   async connect(apiKey: string): Promise<void> {
     const url = new URL('wss://api.deepgram.com/v1/listen')
-    // Use Nova-2 with multilingual support - auto-detects English, Chinese, etc.
-    url.searchParams.set('model', 'nova-2')
+    // Use Nova-3 with multilingual support - best for Chinese/English code-switching
+    url.searchParams.set('model', 'nova-3')
     url.searchParams.set('language', 'multi')
     url.searchParams.set('smart_format', 'true')
     url.searchParams.set('punctuate', 'true')
