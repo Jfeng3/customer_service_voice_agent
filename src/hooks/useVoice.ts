@@ -102,7 +102,8 @@ export function useVoice(): UseVoiceReturn {
           setError(err.message)
         }
       )
-      await deepgramRef.current.connect(key)
+      // Connect with Chinese language support ('zh' for Mandarin, 'en' for English)
+      await deepgramRef.current.connect(key, 'zh')
 
       // Create MediaRecorder with webm/opus format (best compatibility)
       const mediaRecorder = new MediaRecorder(stream, {
