@@ -86,11 +86,26 @@ export function VoiceOrb({
 
   const orbStyles = getOrbStyles()
 
+  const handleClick = () => {
+    if (disabled) return
+    if (isListening) {
+      onStop()
+    } else {
+      onStart()
+    }
+  }
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    // Prevent the click event from also firing on mobile
+    e.preventDefault()
+    handleClick()
+  }
+
   return (
     <div className="relative flex-shrink-0">
-      {/* Outer glow ring */}
+      {/* Outer glow ring - pointer-events-none so it doesn't block touches */}
       <div
-        className={`absolute inset-0 rounded-full transition-all duration-500 ${
+        className={`absolute inset-0 rounded-full transition-all duration-500 pointer-events-none ${
           isListening ? 'animate-pulse-ring' : ''
         }`}
         style={{
@@ -104,7 +119,7 @@ export function VoiceOrb({
       {/* Secondary pulse ring */}
       {isListening && (
         <div
-          className="absolute inset-0 rounded-full animate-pulse-ring"
+          className="absolute inset-0 rounded-full animate-pulse-ring pointer-events-none"
           style={{
             background: 'radial-gradient(circle, rgba(220,38,38,0.2) 0%, transparent 60%)',
             transform: 'scale(1.8)',
@@ -113,10 +128,11 @@ export function VoiceOrb({
         />
       )}
 
-      {/* Main orb button - Toggle mode: click to start, click again to stop */}
+      {/* Main orb button - Toggle mode: tap/click to start, tap/click again to stop */}
       <button
         type="button"
-        onClick={isListening ? onStop : onStart}
+        onClick={handleClick}
+        onTouchEnd={handleTouchEnd}
         disabled={disabled}
         className={`
           relative w-14 h-14 sm:w-14 sm:h-14 rounded-full
@@ -136,7 +152,7 @@ export function VoiceOrb({
       >
         {/* Inner highlight */}
         <div
-          className="absolute inset-[3px] rounded-full opacity-40"
+          className="absolute inset-[3px] rounded-full opacity-40 pointer-events-none"
           style={{
             background: 'linear-gradient(135deg, rgba(255,255,255,0.5) 0%, transparent 50%)',
           }}
@@ -156,7 +172,7 @@ export function VoiceOrb({
         {/* Rotating ring for active states */}
         {(state === 'listening' || state === 'transcribing' || state === 'speaking' || state === 'thinking') && (
           <div
-            className="absolute inset-[-2px] rounded-full animate-orb-rotate"
+            className="absolute inset-[-2px] rounded-full animate-orb-rotate pointer-events-none"
             style={{
               background: `conic-gradient(from 0deg, transparent 0%, ${
                 state === 'listening'
