@@ -15,6 +15,7 @@ export function ChatContainer() {
     isListening,
     isTranscribing,
     transcript,
+    interimTranscript,
     startListening,
     stopListening,
     clearTranscript,
@@ -194,13 +195,18 @@ export function ChatContainer() {
               )}
             </div>
 
-            {/* Transcript preview */}
-            {transcript && (
+            {/* Transcript preview - shows real-time streaming transcription */}
+            {(transcript || interimTranscript) && (
               <div className="px-2 sm:px-4 pb-2 sm:pb-4 -mt-1 sm:-mt-2 animate-fade-in">
                 <div className="px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl bg-[var(--accent-primary-soft)] border border-[var(--accent-primary)]/20">
                   <p className="text-xs sm:text-sm text-[var(--foreground)] opacity-80 font-medium">
                     <span className="text-[var(--accent-primary)] mr-1 sm:mr-2">Heard:</span>
                     {transcript}
+                    {interimTranscript && (
+                      <span className="text-[var(--foreground)] opacity-50 italic">
+                        {transcript ? ' ' : ''}{interimTranscript}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

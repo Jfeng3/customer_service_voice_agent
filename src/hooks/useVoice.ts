@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { DeepgramStreamingClient } from '@/lib/deepgram/streaming'
 
 interface UseVoiceReturn {
   // Speech-to-text
   isListening: boolean
   isTranscribing: boolean
   transcript: string
+  interimTranscript: string
   startListening: () => void
   stopListening: () => Promise<string>
   clearTranscript: () => void
@@ -29,14 +31,16 @@ export function useVoice(): UseVoiceReturn {
   const [isListening, setIsListening] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcript, setTranscript] = useState('')
+  const [interimTranscript, setInterimTranscript] = useState('')
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isSupported, setIsSupported] = useState(true)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const deepgramRef = useRef<DeepgramStreamingClient | null>(null)
+  const finalTranscriptRef = useRef('')
 
   // Web Audio API refs for streaming playback
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -57,7 +61,8 @@ export function useVoice(): UseVoiceReturn {
   const startListening = useCallback(async () => {
     setError(null)
     setTranscript('')
-    audioChunksRef.current = []
+    setInterimTranscript('')
+    finalTranscriptRef.current = ''
 
     try {
       // Request microphone access
@@ -70,6 +75,29 @@ export function useVoice(): UseVoiceReturn {
       })
       streamRef.current = stream
 
+      // Get temporary Deepgram key
+      const tokenRes = await fetch('/api/voice/token')
+      if (!tokenRes.ok) {
+        throw new Error('Failed to get streaming token')
+      }
+      const { key } = await tokenRes.json()
+
+      // Connect to Deepgram
+      deepgramRef.current = new DeepgramStreamingClient(
+        (text, isFinal) => {
+          if (isFinal) {
+            // Append to accumulated transcript
+            finalTranscriptRef.current = (finalTranscriptRef.current + ' ' + text).trim()
+            setTranscript(finalTranscriptRef.current)
+            setInterimTranscript('')
+          } else {
+            setInterimTranscript(text)
+          }
+        },
+        (err) => setError(err.message)
+      )
+      await deepgramRef.current.connect(key)
+
       // Create MediaRecorder with webm/opus format (best compatibility)
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -77,19 +105,30 @@ export function useVoice(): UseVoiceReturn {
           : 'audio/webm',
       })
 
+      // Stream audio chunks immediately to Deepgram
       mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data)
+        if (event.data.size > 0 && deepgramRef.current?.isConnected) {
+          deepgramRef.current.sendAudio(event.data)
         }
       }
 
       mediaRecorderRef.current = mediaRecorder
-      mediaRecorder.start(100) // Collect data every 100ms
+      mediaRecorder.start(100) // Send every 100ms
       setIsListening(true)
     } catch (err) {
       console.error('Failed to start recording:', err)
       setError('Failed to access microphone. Please allow microphone access.')
       setIsListening(false)
+
+      // Cleanup on error
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+      if (deepgramRef.current) {
+        deepgramRef.current.close()
+        deepgramRef.current = null
+      }
     }
   }, [])
 
@@ -101,9 +140,10 @@ export function useVoice(): UseVoiceReturn {
         return
       }
 
+      setIsTranscribing(true)
+
       mediaRecorderRef.current.onstop = async () => {
         setIsListening(false)
-        setIsTranscribing(true)
 
         // Stop all tracks
         if (streamRef.current) {
@@ -111,51 +151,32 @@ export function useVoice(): UseVoiceReturn {
           streamRef.current = null
         }
 
-        // Create audio blob
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-        audioChunksRef.current = []
-
-        // Skip if too short (less than 0.5 seconds of audio)
-        if (audioBlob.size < 5000) {
-          setIsTranscribing(false)
-          resolve('')
-          return
+        // Close Deepgram connection to get final results
+        if (deepgramRef.current) {
+          deepgramRef.current.close()
+          deepgramRef.current = null
         }
 
-        try {
-          // Send to Deepgram API
-          const formData = new FormData()
-          formData.append('audio', audioBlob, 'recording.webm')
+        // Wait a brief moment for any final transcripts
+        await new Promise((r) => setTimeout(r, 200))
 
-          const response = await fetch('/api/voice/input', {
-            method: 'POST',
-            body: formData,
-          })
+        // Combine final transcript with any remaining interim
+        const fullTranscript = (finalTranscriptRef.current + ' ' + interimTranscript).trim()
+        setTranscript(fullTranscript)
+        setInterimTranscript('')
+        setIsTranscribing(false)
 
-          if (!response.ok) {
-            throw new Error('Transcription failed')
-          }
-
-          const data = await response.json()
-          const transcriptText = data.transcript || ''
-
-          setTranscript(transcriptText)
-          setIsTranscribing(false)
-          resolve(transcriptText)
-        } catch (err) {
-          console.error('Transcription error:', err)
-          setError('Failed to transcribe audio')
-          setIsTranscribing(false)
-          resolve('')
-        }
+        resolve(fullTranscript)
       }
 
       mediaRecorderRef.current.stop()
     })
-  }, [])
+  }, [interimTranscript])
 
   const clearTranscript = useCallback(() => {
     setTranscript('')
+    setInterimTranscript('')
+    finalTranscriptRef.current = ''
   }, [])
 
   // Text-to-speech using ElevenLabs API
@@ -318,6 +339,9 @@ export function useVoice(): UseVoiceReturn {
       if (audioContextRef.current) {
         audioContextRef.current.close()
       }
+      if (deepgramRef.current) {
+        deepgramRef.current.close()
+      }
     }
   }, [])
 
@@ -325,6 +349,7 @@ export function useVoice(): UseVoiceReturn {
     isListening,
     isTranscribing,
     transcript,
+    interimTranscript,
     startListening,
     stopListening,
     clearTranscript,
