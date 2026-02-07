@@ -196,26 +196,41 @@ export function ChatContainer() {
             </div>
 
             {/* Transcript preview - shows real-time streaming transcription */}
-            {(transcript || interimTranscript) && (
+            {(transcript || interimTranscript || isListening) && (
               <div className="px-2 sm:px-4 pb-2 sm:pb-4 -mt-1 sm:-mt-2 animate-fade-in">
-                <div className="px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl bg-[var(--accent-primary-soft)] border border-[var(--accent-primary)]/20">
-                  <p className="text-xs sm:text-sm text-[var(--foreground)] opacity-80 font-medium">
-                    <span className="text-[var(--accent-primary)] mr-1 sm:mr-2">Heard:</span>
-                    {transcript}
-                    {interimTranscript && (
-                      <span className="text-[var(--foreground)] opacity-50 italic">
-                        {transcript ? ' ' : ''}{interimTranscript}
-                      </span>
-                    )}
-                  </p>
+                <div className="px-3 sm:px-4 py-2.5 sm:py-2 rounded-xl sm:rounded-xl bg-[var(--accent-primary-soft)] border border-[var(--accent-primary)]/20">
+                  {/* Show recording indicator when listening but no transcript yet */}
+                  {isListening && !transcript && !interimTranscript ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+                      </div>
+                      <p className="text-sm text-[var(--foreground)] opacity-70 font-medium">
+                        Listening... tap the mic to stop
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-[var(--foreground)] opacity-80 font-medium leading-relaxed">
+                      <span className="text-[var(--accent-primary)] mr-1.5">Heard:</span>
+                      {transcript}
+                      {interimTranscript && (
+                        <span className="text-[var(--foreground)] opacity-50 italic">
+                          {transcript ? ' ' : ''}{interimTranscript}
+                        </span>
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Hint text - hidden on mobile */}
-          <p className="hidden sm:block text-center text-xs text-[var(--foreground)] opacity-40 mt-3 font-display">
-            Press Enter to send • Click orb to start/stop recording • Hold Space for push-to-talk
+          {/* Hint text - simplified for mobile */}
+          <p className="text-center text-xs text-[var(--foreground)] opacity-40 mt-2 sm:mt-3 font-display">
+            <span className="sm:hidden">Tap mic to record</span>
+            <span className="hidden sm:inline">Press Enter to send • Click orb to start/stop recording • Hold Space for push-to-talk</span>
           </p>
         </div>
       </div>

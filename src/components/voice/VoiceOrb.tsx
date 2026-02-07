@@ -119,11 +119,12 @@ export function VoiceOrb({
         onClick={isListening ? onStop : onStart}
         disabled={disabled}
         className={`
-          relative w-12 h-12 sm:w-14 sm:h-14 rounded-full
+          relative w-14 h-14 sm:w-14 sm:h-14 rounded-full
           flex items-center justify-center
           transition-all duration-300 ease-out
-          focus-ring
-          ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-95'}
+          focus-ring select-none
+          touch-manipulation
+          ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-90'}
           ${state === 'idle' ? 'animate-breathe' : ''}
         `}
         style={{
