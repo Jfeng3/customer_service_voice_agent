@@ -113,14 +113,10 @@ export function VoiceOrb({
         />
       )}
 
-      {/* Main orb button */}
+      {/* Main orb button - Toggle mode: click to start, click again to stop */}
       <button
         type="button"
-        onMouseDown={onStart}
-        onMouseUp={onStop}
-        onMouseLeave={onStop}
-        onTouchStart={onStart}
-        onTouchEnd={onStop}
+        onClick={isListening ? onStop : onStart}
         disabled={disabled}
         className={`
           relative w-12 h-12 sm:w-14 sm:h-14 rounded-full
@@ -135,7 +131,7 @@ export function VoiceOrb({
           boxShadow: orbStyles.boxShadow,
           transform: `scale(${orbStyles.scale})`,
         }}
-        aria-label={isListening ? 'Release to send' : 'Hold to speak'}
+        aria-label={isListening ? 'Click to stop recording' : 'Click to start recording'}
       >
         {/* Inner highlight */}
         <div

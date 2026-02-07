@@ -76,15 +76,18 @@ export function useVoice(): UseVoiceReturn {
       streamRef.current = stream
 
       // Get temporary Deepgram key
+      console.log('🎙️ Fetching Deepgram token...')
       const tokenRes = await fetch('/api/voice/token')
       if (!tokenRes.ok) {
         throw new Error('Failed to get streaming token')
       }
       const { key } = await tokenRes.json()
+      console.log('🎙️ Got Deepgram token, connecting...')
 
       // Connect to Deepgram
       deepgramRef.current = new DeepgramStreamingClient(
         (text, isFinal) => {
+          console.log(`🎙️ Transcript received: "${text}" (final: ${isFinal})`)
           if (isFinal) {
             // Append to accumulated transcript
             finalTranscriptRef.current = (finalTranscriptRef.current + ' ' + text).trim()
@@ -94,7 +97,10 @@ export function useVoice(): UseVoiceReturn {
             setInterimTranscript(text)
           }
         },
-        (err) => setError(err.message)
+        (err) => {
+          console.error('🎙️ Deepgram error:', err)
+          setError(err.message)
+        }
       )
       await deepgramRef.current.connect(key)
 
@@ -107,6 +113,7 @@ export function useVoice(): UseVoiceReturn {
 
       // Stream audio chunks immediately to Deepgram
       mediaRecorder.ondataavailable = (event) => {
+        console.log(`🎙️ MediaRecorder chunk: ${event.data.size} bytes, connected: ${deepgramRef.current?.isConnected}`)
         if (event.data.size > 0 && deepgramRef.current?.isConnected) {
           deepgramRef.current.sendAudio(event.data)
         }

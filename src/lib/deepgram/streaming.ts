@@ -69,9 +69,19 @@ export class DeepgramStreamingClient {
     })
   }
 
-  sendAudio(data: Blob | ArrayBuffer): void {
+  async sendAudio(data: Blob | ArrayBuffer): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(data)
+      // Convert Blob to ArrayBuffer if needed (WebSocket handles ArrayBuffer better)
+      if (data instanceof Blob) {
+        const buffer = await data.arrayBuffer()
+        console.log(`🎤 Sending audio chunk: ${buffer.byteLength} bytes`)
+        this.ws.send(buffer)
+      } else {
+        console.log(`🎤 Sending audio chunk: ${data.byteLength} bytes`)
+        this.ws.send(data)
+      }
+    } else {
+      console.log('🎤 WebSocket not open, state:', this.ws?.readyState)
     }
   }
 

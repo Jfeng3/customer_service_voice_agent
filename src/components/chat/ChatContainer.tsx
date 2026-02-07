@@ -215,7 +215,7 @@ export function ChatContainer() {
 
           {/* Hint text - hidden on mobile */}
           <p className="hidden sm:block text-center text-xs text-[var(--foreground)] opacity-40 mt-3 font-display">
-            Press Enter to send or hold the orb to speak
+            Press Enter to send • Click orb to start/stop recording • Hold Space for push-to-talk
           </p>
         </div>
       </div>
