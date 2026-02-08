@@ -43,6 +43,9 @@ Required in `.env.local`:
 - `WANDB_PROJECT` - W&B project name (default: customer-service-voice-agent)
 - `FIRECRAWL_API_KEY` - Firecrawl API key (for website crawling)
 - `DEEPGRAM_API_KEY` - Deepgram API key (for speech-to-text)
+- `SQUARE_ACCESS_TOKEN` - Square API access token
+- `SQUARE_ENVIRONMENT` - Square environment (`sandbox` or `production`)
+- `SQUARE_LOCATION_ID` - Square location ID
 
 ## Database Tables
 - `csva_messages` - Chat message history
@@ -70,13 +73,5 @@ npm run dev
 - Use Supabase Realtime Broadcast for real-time events (no DB writes needed)
 - Store persistent data (messages, tool calls) in Supabase tables with `csva_` prefix
 
-## Planning
-When user says "plan", create a plan file in `plans/` folder with two sections:
 
-### User Flow (<200 words)
-Describe the UI and user experience: what the user sees, clicks, and how the interface responds.
 
-### Architecture (<200 words)
-Describe technical implementation: data models, API routes, data flow, and key files to modify.
-
-Save as: `plans/<feature-name>.md`
